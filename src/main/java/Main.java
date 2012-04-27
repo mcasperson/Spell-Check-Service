@@ -122,7 +122,18 @@ public class Main
 				/* Check for doubled words */
 				if (i != 0)
 				{
-					if (word.toLowerCase().equals(xmlTextWords.get(i - 1)))
+					/* don't detected numbers */
+					boolean isNumber = true;
+					try
+					{
+						Double.parseDouble(word);
+					}
+					catch (final Exception ex)
+					{
+						isNumber = false;
+					}
+					
+					if (!isNumber && word.toLowerCase().equals(xmlTextWords.get(i - 1)))
 					{
 						if (!doubleWords.contains(word + " " + word))
 							doubleWords.add(word + " " + word);
@@ -193,12 +204,15 @@ public class Main
 					}
 					spellingErrors.append(":" + spaces.toString() + " ");
 					spellingErrors.append(CollectionUtilities.toSeperatedString(errors.get(word), ", "));
+					spellingErrors.append("\n");
 				}
 
 				System.out.println(spellingErrors.toString());				
 			}
-			
-			System.out.println();
+			else
+			{			
+				System.out.println();
+			}
 		}
 	}
 
