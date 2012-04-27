@@ -1,6 +1,9 @@
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.ws.rs.core.PathSegment;
 
@@ -105,7 +108,8 @@ public class Main
 		/* Get the word list */
 		final List<String> xmlTextWords = CollectionUtilities.toArrayList(xmlText.split(PUNCTUATION_CHARACTERS_RE));
 
-		final StringBuilder errors = new StringBuilder();
+		final Map<String, List<String>> errors = new HashMap<String, List<String>>();
+		final Map<String, Integer> errorCounts = new HashMap<String, Integer>();
 
 		for (final String word : xmlTextWords)
 		{
@@ -116,30 +120,34 @@ public class Main
 
 				if (standardDictMispelled && customDictMispelled)
 				{
-					if (errors.length() == 0)
+					if (errors.containsKey(word))
 					{
-						errors.append("Topic ID: " + topic.getId() + " Title: " + topic.getTitle() + "\n");
+						errorCounts.put(word, errorCounts.get(word) + 1);
 					}
-
-					final List<String> suggestions = standarddict.suggest(word);
-					CollectionUtilities.addAllThatDontExist(customDict.suggest(word), suggestions);
-
-					errors.append(word);
-					errors.append(":");
-
-					for (final String suggestion : suggestions)
+					else
 					{
-						errors.append(" ");
-						errors.append(suggestion);
+						final List<String> suggestions = standarddict.suggest(word);
+						CollectionUtilities.addAllThatDontExist(customDict.suggest(word), suggestions);
+						Collections.sort(suggestions);
+						
+						errors.put(word,  suggestions);
+						errorCounts.put(word, 1);
 					}
-
-					errors.append("\n");
 				}
 			}
 		}
 
-		if (errors.length() != 0)
-			System.out.println(errors.toString());
+		if (errors.size() != 0)
+		{
+			for (final String word : errors.keySet())
+			{
+				System.out.print(word);
+				if (errorCounts.get(word) != 1)
+					System.out.print(" [x" + errorCounts.get(word) + "]");
+				System.out.print(": ");
+				System.out.println(CollectionUtilities.toSeperatedString(errors.get(word)));
+			}
+		}
 	}
 
 	/**
