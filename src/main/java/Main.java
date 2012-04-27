@@ -137,7 +137,7 @@ public class Main
 						isNumber = false;
 					}
 					
-					if (!isNumber && word.toLowerCase().equals(xmlTextWords.get(i - 1)))
+					if (!isNumber && word.toLowerCase().equals(xmlTextWordsForDoubleChecking.get(i - 1)))
 					{
 						if (!doubleWords.contains(word + " " + word))
 							doubleWords.add(word + " " + word);
