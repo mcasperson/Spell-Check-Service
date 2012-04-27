@@ -111,11 +111,25 @@ public class Main
 
 		final Map<String, List<String>> errors = new TreeMap<String, List<String>>();
 		final Map<String, Integer> errorCounts = new HashMap<String, Integer>();
+		final List<String> doubleWords = new ArrayList<String>();
 
-		for (final String word : xmlTextWords)
+		for (int i = 0; i < xmlTextWords.size(); ++i)
 		{
+			final String word = xmlTextWords.get(i);
+
 			if (!word.trim().isEmpty())
 			{
+				/* Check for doubled words */
+				if (i != 0)
+				{
+					if (word.toLowerCase().equals(xmlTextWords.get(i - 1)))
+					{
+						if (!doubleWords.contains(word + " " + word))
+							doubleWords.add(word + " " + word);
+					}
+				}
+
+				/* Check spelling */
 				final boolean standardDictMispelled = standarddict.misspelled(word);
 				final boolean customDictMispelled = customDict.misspelled(word);
 
@@ -130,42 +144,60 @@ public class Main
 						final List<String> suggestions = standarddict.suggest(word);
 						CollectionUtilities.addAllThatDontExist(customDict.suggest(word), suggestions);
 						Collections.sort(suggestions);
-						
-						errors.put(word,  suggestions);
+
+						errors.put(word, suggestions);
 						errorCounts.put(word, 1);
 					}
 				}
 			}
 		}
 
-		if (errors.size() != 0)
+		if (errors.size() != 0 || doubleWords.size() != 0)
 		{
 			System.out.println("Topic ID: " + topic.getId() + " Title: " + topic.getTitle());
-			
-			int longestWord = 0;
-			for (final String word : errors.keySet())
+
+			if (doubleWords.size() != 0)
 			{
-				final int wordLength = word.length() + (errorCounts.get(word) != 1 ? 5 : 0);
-				longestWord = wordLength > longestWord ? wordLength : longestWord;
+				final StringBuilder doubleWordErrors = new StringBuilder();
+
+				if (doubleWords.size() != 0)
+				{
+					doubleWordErrors.append("Doubled Words: " + CollectionUtilities.toSeperatedString(doubleWords, ", "));
+					System.out.println(doubleWordErrors.toString());
+				}
+			}
+
+			if (errors.size() != 0)
+			{
+				final StringBuilder spellingErrors = new StringBuilder();
+
+				int longestWord = 0;
+				for (final String word : errors.keySet())
+				{
+					final int wordLength = word.length() + (errorCounts.get(word) != 1 ? 5 : 0);
+					longestWord = wordLength > longestWord ? wordLength : longestWord;
+				}
+
+				for (final String word : errors.keySet())
+				{
+					final StringBuilder spaces = new StringBuilder();
+					for (int i = word.length() + (errorCounts.get(word) != 1 ? 5 : 0); i < longestWord; ++i)
+					{
+						spaces.append(" ");
+					}
+
+					spellingErrors.append(word);
+					if (errorCounts.get(word) != 1)
+					{
+						spellingErrors.append(" [x" + errorCounts.get(word) + "]");
+					}
+					spellingErrors.append(":" + spaces.toString() + " ");
+					spellingErrors.append(CollectionUtilities.toSeperatedString(errors.get(word), ", "));
+				}
+
+				System.out.println(spellingErrors.toString());				
 			}
 			
-			for (final String word : errors.keySet())
-			{
-				final StringBuilder spaces = new StringBuilder();
-				for (int i = word.length() + (errorCounts.get(word) != 1 ? 5 : 0); i < longestWord; ++i)
-				{
-					spaces.append(" ");
-				}
-				
-				System.out.print(word);
-				if (errorCounts.get(word) != 1)
-				{
-					System.out.print(" [x" + errorCounts.get(word) + "]");
-					
-				}
-				System.out.print(":" + spaces.toString() + " ");
-				System.out.println(CollectionUtilities.toSeperatedString(errors.get(word), ", "));
-			}
 			System.out.println();
 		}
 	}
