@@ -67,7 +67,7 @@ public class Main
 
 			final BaseRestCollectionV1<TopicV1> topics = restClient.getJSONTopicsWithQuery(pathSegment, expandEncodedStrnig);
 			final StringConstantV1 ignoreTags = restClient.getJSONStringConstant(DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID, "");
-			final List<String> ignoreTagsList = CollectionUtilities.toArrayList(ignoreTags.getValue().split("\n"));
+			final List<String> ignoreTagsList = CollectionUtilities.toArrayList(ignoreTags.getValue().split("\r\n"));
 
 			final Dictionary standardDict = Hunspell.getInstance().getDictionary("target/classes/dict/en_US/en_US");
 			final Dictionary customDict = Hunspell.getInstance().getDictionary("target/classes/customdict/en_US/en_US");
