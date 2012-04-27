@@ -108,14 +108,18 @@ public class Main
 
 		/* Get the word list */
 		final List<String> xmlTextWords = CollectionUtilities.toArrayList(xmlText.split(PUNCTUATION_CHARACTERS_RE));
+		
+		/* Get the word list, including punctuation (which reduces the double word false positives) */
+		final List<String> xmlTextWordsForDoubleChecking = CollectionUtilities.toArrayList(xmlText.split("\\s+"));
 
 		final Map<String, List<String>> errors = new TreeMap<String, List<String>>();
 		final Map<String, Integer> errorCounts = new HashMap<String, Integer>();
 		final List<String> doubleWords = new ArrayList<String>();
-
-		for (int i = 0; i < xmlTextWords.size(); ++i)
+		
+		/* Check for double words */
+		for (int i = 0; i < xmlTextWordsForDoubleChecking.size(); ++i)
 		{
-			final String word = xmlTextWords.get(i);
+			final String word = xmlTextWordsForDoubleChecking.get(i);
 
 			if (!word.trim().isEmpty())
 			{
@@ -139,7 +143,16 @@ public class Main
 							doubleWords.add(word + " " + word);
 					}
 				}
+			}
+		}
 
+		/* Check for spelling */
+		for (int i = 0; i < xmlTextWords.size(); ++i)
+		{
+			final String word = xmlTextWords.get(i);
+
+			if (!word.trim().isEmpty())
+			{
 				/* Check spelling */
 				final boolean standardDictMispelled = standarddict.misspelled(word);
 				final boolean customDictMispelled = customDict.misspelled(word);
