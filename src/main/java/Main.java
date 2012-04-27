@@ -140,13 +140,30 @@ public class Main
 
 		if (errors.size() != 0)
 		{
-			System.out.println("Topic ID: " + topic.getId() + " Title: " + topic.getTitle());			
+			System.out.println("Topic ID: " + topic.getId() + " Title: " + topic.getTitle());
+			
+			int longestWord = 0;
 			for (final String word : errors.keySet())
 			{
+				final int wordLength = word.length() + (errorCounts.get(word) != 1 ? 5 : 0);
+				longestWord = wordLength > longestWord ? wordLength : longestWord;
+			}
+			
+			for (final String word : errors.keySet())
+			{
+				final StringBuilder spaces = new StringBuilder();
+				for (int i = word.length() + (errorCounts.get(word) != 1 ? 5 : 0); i < longestWord; ++i)
+				{
+					spaces.append(" ");
+				}
+				
 				System.out.print(word);
 				if (errorCounts.get(word) != 1)
+				{
 					System.out.print(" [x" + errorCounts.get(word) + "]");
-				System.out.print(": ");
+					
+				}
+				System.out.print(":" + spaces.toString() + " ");
 				System.out.println(CollectionUtilities.toSeperatedString(errors.get(word), ", "));
 			}
 			System.out.println();
