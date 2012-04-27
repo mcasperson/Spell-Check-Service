@@ -182,7 +182,8 @@ public class Main
 
 		if (errors.size() != 0 || doubleWords.size() != 0)
 		{
-			System.out.println("Topic ID: " + topic.getId() + " Title: " + topic.getTitle());
+			System.out.println("Topic ID: " + topic.getId());
+			System.out.println("Topic Title: " + topic.getTitle());
 
 			if (doubleWords.size() != 0)
 			{
