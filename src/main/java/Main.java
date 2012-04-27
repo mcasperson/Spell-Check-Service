@@ -127,17 +127,21 @@ public class Main
 				if (i != 0)
 				{
 					/* don't detected numbers */
-					boolean isNumber = true;
 					try
 					{
 						Double.parseDouble(word);
+						continue;
 					}
 					catch (final Exception ex)
 					{
-						isNumber = false;
+						
 					}
 					
-					if (!isNumber && word.toLowerCase().equals(xmlTextWordsForDoubleChecking.get(i - 1)))
+					/* make sure the "word" is not just punctuation */
+					if (word.matches(PUNCTUATION_CHARACTERS_RE + "+"))
+						continue;
+					
+					if (word.toLowerCase().equals(xmlTextWordsForDoubleChecking.get(i - 1)))
 					{
 						if (!doubleWords.contains(word + " " + word))
 							doubleWords.add(word + " " + word);
