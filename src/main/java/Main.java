@@ -17,17 +17,20 @@ import org.jboss.resteasy.specimpl.PathSegmentImpl;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
+import org.w3c.dom.Text;
 
 import com.redhat.ecs.commonutils.CollectionUtilities;
 import com.redhat.ecs.commonutils.ExceptionUtilities;
 import com.redhat.ecs.commonutils.XMLUtilities;
 import com.redhat.ecs.servicepojo.ServiceStarter;
+import com.redhat.ecs.services.docbookcompiling.xmlprocessing.XMLPreProcessor;
 import com.redhat.topicindex.rest.collections.BaseRestCollectionV1;
 import com.redhat.topicindex.rest.entities.StringConstantV1;
 import com.redhat.topicindex.rest.entities.TopicV1;
 import com.redhat.topicindex.rest.expand.ExpandDataDetails;
 import com.redhat.topicindex.rest.expand.ExpandDataTrunk;
 import com.redhat.topicindex.rest.sharedinterface.RESTInterfaceV1;
+import com.redhat.topicindex.syntaxchecker.data.SpellingErrorData;
 
 import dk.dren.hunspell.Hunspell;
 import dk.dren.hunspell.Hunspell.Dictionary;
@@ -37,7 +40,11 @@ public class Main
 	private static final String SPELL_CHECK_QUERY_SYSTEM_PROPERTY = "topicIndex.spellCheckQuery";
 	private static final Integer DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID = 30;
 	/** http://en.wikipedia.org/wiki/Regular_expression#POSIX_character_classes **/
-	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^_`{|}~\\-\\s]+";
+	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^_`{|}~\\-\\s]";
+	private static final String XREF_RE = "<xref*.?/\\s*>";
+	private static final String ENTRY_RE = "<entry>";
+	private static final String ENTRY_CLOSE_RE = "</entry>";
+	private static final String ELEMENT_PUNCTUATION_MARKER = "#";
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final String query;
 
@@ -89,33 +96,152 @@ public class Main
 	}
 
 	/**
-	 * Here we spell check a topic
-	 * 
-	 * @param topic
-	 *            The topic to be spell checked
-	 * @param ignoreElements
-	 *            The list of elements that are to be ignored
+	 * Process the topic for spelling and grammar issues
+	 * @param topic The topic to process
+	 * @param ignoreElements The XML elements to ignore
+	 * @param standardDict The standard dictionary
+	 * @param customDict The custom dictionary
 	 */
-	private void processDocument(final TopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
+	private void processDocument(final TopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
 	{
+		final List<SpellingErrorData> spellingErrors =  checkSpelling(topic, ignoreElements, standardDict, customDict);
+		final List<String> doubleWords = checkGrammar(topic, ignoreElements);
+
+		if (spellingErrors.size() != 0 || doubleWords.size() != 0)
+		{
+			System.out.println("Topic ID: " + topic.getId());
+			System.out.println("Topic Title: " + topic.getTitle());
+
+			if (doubleWords.size() != 0)
+			{
+				final StringBuilder doubleWordErrors = new StringBuilder();
+
+				if (doubleWords.size() != 0)
+				{
+					doubleWordErrors.append("Doubled Words: " + CollectionUtilities.toSeperatedString(doubleWords, ", "));
+					System.out.println(doubleWordErrors.toString());
+				}
+			}
+
+			if (spellingErrors.size() != 0)
+			{
+				final StringBuilder spellingErrorsMessage = new StringBuilder();
+
+				int longestWord = 0;
+				for (final SpellingErrorData error : spellingErrors)
+				{
+					final int wordLength = error.getMisspelledWord().length() + (error.getMispellCount() != 1 ? 5 : 0);
+					longestWord = wordLength > longestWord ? wordLength : longestWord;
+				}
+
+				for (final SpellingErrorData error : spellingErrors)
+				{
+					final StringBuilder spaces = new StringBuilder();
+					for (int i = error.getMisspelledWord().length() + (error.getMispellCount() != 1 ? 5 : 0); i < longestWord; ++i)
+					{
+						spaces.append(" ");
+					}
+
+					spellingErrorsMessage.append(error.getMisspelledWord());
+					if (error.getMispellCount() != 1)
+					{
+						spellingErrorsMessage.append(" [x" + error.getMispellCount() + "]");
+					}
+					spellingErrorsMessage.append(":" + spaces.toString() + " ");
+					spellingErrorsMessage.append(CollectionUtilities.toSeperatedString(error.getSuggestions(), ", "));
+					spellingErrorsMessage.append("\n");
+				}
+
+				System.out.println(spellingErrorsMessage.toString());
+			}
+			else
+			{
+				System.out.println();
+			}
+		}
+	}
+	
+	/**
+	 * Checks the topic for spelling errors
+	 * @param topic The topic to process
+	 * @param ignoreElements The XML elements to ignore
+	 * @param standardDict The standard dictionary
+	 * @param customDict The custom dictionary
+	 * @return A collection of spelling errors, their frequency, and suggested replacements
+	 */
+	private List<SpellingErrorData> checkSpelling(final TopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
+	{
+		/*
+		 * prepare the topic xml for a spell check
+		 */
 		final Document doc = XMLUtilities.convertStringToDocument(topic.getXml());
 		stripOutIgnoredElements(doc, ignoreElements);
 		final String cleanedXML = XMLUtilities.convertDocumentToString(doc, "UTF-8").replaceAll("\n", " ");
-
-		/* render the XML to text using jericho */
+		
 		final Source source = new Source(cleanedXML);
 		final String xmlText = source.getRenderer().toString();
 
 		/* Get the word list */
-		final List<String> xmlTextWords = CollectionUtilities.toArrayList(xmlText.split(PUNCTUATION_CHARACTERS_RE));
+		final List<String> xmlTextWords = CollectionUtilities.toArrayList(xmlText.split(PUNCTUATION_CHARACTERS_RE + "+"));
 		
-		/* Get the word list, including punctuation (which reduces the double word false positives) */
-		final List<String> xmlTextWordsForDoubleChecking = CollectionUtilities.toArrayList(xmlText.split("\\s+"));
+		/* Some collections to hold the spelling error details */
+		final Map<String, SpellingErrorData> misspelledWords = new HashMap<String, SpellingErrorData>();
 
-		final Map<String, List<String>> errors = new TreeMap<String, List<String>>();
-		final Map<String, Integer> errorCounts = new HashMap<String, Integer>();
-		final List<String> doubleWords = new ArrayList<String>();
+		/* Check for spelling */
+		for (int i = 0; i < xmlTextWords.size(); ++i)
+		{
+			final String word = xmlTextWords.get(i);
+
+			if (!word.trim().isEmpty())
+			{
+				/* Check spelling */
+				final boolean standardDictMispelled = standarddict.misspelled(word);
+				final boolean customDictMispelled = customDict.misspelled(word);
+
+				if (standardDictMispelled && customDictMispelled)
+				{
+					if (misspelledWords.containsKey(word))
+					{
+						misspelledWords.get(word).incMispellCount();
+					}
+					else
+					{
+						final List<String> suggestions = standarddict.suggest(word);
+						CollectionUtilities.addAllThatDontExist(customDict.suggest(word), suggestions);
+						Collections.sort(suggestions);
+
+						misspelledWords.put(word, new SpellingErrorData(word, suggestions));
+					}
+				}
+			}
+		}
 		
+		return CollectionUtilities.toArrayList(misspelledWords.values());
+	}
+	
+	/**
+	 * Checks the Docbook XML for common grammar errors
+	 * @param topic The topic to process
+	 * @param ignoreElements The list of XML elements to ignore
+	 * @return A list of grammar errors that were found
+	 */
+	private List<String> checkGrammar(final TopicV1 topic, final List<String> ignoreElements)
+	{
+		/*
+		 * prepare the topic xml for a grammar check
+		 */
+		final Document grammarDoc = XMLUtilities.convertStringToDocument(topic.getXml());
+		replaceIgnoredElements(grammarDoc, ignoreElements);
+		final String grammarCleanedXML = XMLUtilities.convertDocumentToString(grammarDoc, "UTF-8").replaceAll("\n", " ");
+		
+		final Source grammarSource = new Source(replaceElementsWithMarkers(grammarCleanedXML));
+		final String grammarXmlText = grammarSource.getRenderer().toString();
+
+		/* Get the grammar word list */
+		final List<String> xmlTextWordsForDoubleChecking = CollectionUtilities.toArrayList(grammarXmlText.split("\\s+"));
+
+		final List<String> doubleWords = new ArrayList<String>();
+
 		/* Check for double words */
 		for (int i = 0; i < xmlTextWordsForDoubleChecking.size(); ++i)
 		{
@@ -134,13 +260,13 @@ public class Main
 					}
 					catch (final Exception ex)
 					{
-						
+
 					}
-					
+
 					/* make sure the "word" is not just punctuation */
 					if (word.matches(PUNCTUATION_CHARACTERS_RE + "+"))
 						continue;
-					
+
 					if (word.toLowerCase().equals(xmlTextWordsForDoubleChecking.get(i - 1)))
 					{
 						if (!doubleWords.contains(word + " " + word))
@@ -149,89 +275,35 @@ public class Main
 				}
 			}
 		}
+		
+		return doubleWords;
+	}
 
-		/* Check for spelling */
-		for (int i = 0; i < xmlTextWords.size(); ++i)
-		{
-			final String word = xmlTextWords.get(i);
-
-			if (!word.trim().isEmpty())
-			{
-				/* Check spelling */
-				final boolean standardDictMispelled = standarddict.misspelled(word);
-				final boolean customDictMispelled = customDict.misspelled(word);
-
-				if (standardDictMispelled && customDictMispelled)
-				{
-					if (errors.containsKey(word))
-					{
-						errorCounts.put(word, errorCounts.get(word) + 1);
-					}
-					else
-					{
-						final List<String> suggestions = standarddict.suggest(word);
-						CollectionUtilities.addAllThatDontExist(customDict.suggest(word), suggestions);
-						Collections.sort(suggestions);
-
-						errors.put(word, suggestions);
-						errorCounts.put(word, 1);
-					}
-				}
-			}
-		}
-
-		if (errors.size() != 0 || doubleWords.size() != 0)
-		{
-			System.out.println("Topic ID: " + topic.getId());
-			System.out.println("Topic Title: " + topic.getTitle());
-
-			if (doubleWords.size() != 0)
-			{
-				final StringBuilder doubleWordErrors = new StringBuilder();
-
-				if (doubleWords.size() != 0)
-				{
-					doubleWordErrors.append("Doubled Words: " + CollectionUtilities.toSeperatedString(doubleWords, ", "));
-					System.out.println(doubleWordErrors.toString());
-				}
-			}
-
-			if (errors.size() != 0)
-			{
-				final StringBuilder spellingErrors = new StringBuilder();
-
-				int longestWord = 0;
-				for (final String word : errors.keySet())
-				{
-					final int wordLength = word.length() + (errorCounts.get(word) != 1 ? 5 : 0);
-					longestWord = wordLength > longestWord ? wordLength : longestWord;
-				}
-
-				for (final String word : errors.keySet())
-				{
-					final StringBuilder spaces = new StringBuilder();
-					for (int i = word.length() + (errorCounts.get(word) != 1 ? 5 : 0); i < longestWord; ++i)
-					{
-						spaces.append(" ");
-					}
-
-					spellingErrors.append(word);
-					if (errorCounts.get(word) != 1)
-					{
-						spellingErrors.append(" [x" + errorCounts.get(word) + "]");
-					}
-					spellingErrors.append(":" + spaces.toString() + " ");
-					spellingErrors.append(CollectionUtilities.toSeperatedString(errors.get(word), ", "));
-					spellingErrors.append("\n");
-				}
-
-				System.out.println(spellingErrors.toString());				
-			}
-			else
-			{			
-				System.out.println();
-			}
-		}
+	/**
+	 * When converting XML to plain text, the loss of some elements causes
+	 * unintended side effects for the grammar checks. A sentence such as
+	 * "Refer to <xref linkend="something"/> to find out more information" will
+	 * appear to have repeated the word "to" when the xref is removed.
+	 * 
+	 * This method will replace these elements with a punctuation marker, which 
+	 * is then used to break up the sequence of words to prevent these false
+	 * positivies.
+	 * 
+	 * @param input The XML to be processed
+	 * @return The XML with certain tags replaced with a punctuation marker
+	 */
+	private String replaceElementsWithMarkers(final String input)
+	{
+		return input.replaceAll(XREF_RE, ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll(ENTRY_RE, ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll(ENTRY_CLOSE_RE, ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_SEQUENCE_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_LIST_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_LISTITEMS_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_ALPHA_SORT_INJECTION_LIST_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_SINGLE_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.INJECT_CONTENT_FRAGMENT_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.INJECT_TITLE_FRAGMENT_RE + "-->", ELEMENT_PUNCTUATION_MARKER);				
 	}
 
 	/**
@@ -268,6 +340,50 @@ public class Main
 		{
 			final Node childNode = node.getChildNodes().item(i);
 			stripOutIgnoredElements(childNode, ignoreElements);
+		}
+	}
+	
+	/**
+	 * Here we replace any nodes that we don't want to include in the grammar checks with
+	 * punctuation marks
+	 * 
+	 * @param node
+	 *            The node to process
+	 * @param ignoreElements
+	 *            The list of elements that are to be ignored
+	 */
+	private void replaceIgnoredElements(final Node node, final List<String> ignoreElements)
+	{
+		final List<Node> removeNodes = new ArrayList<Node>();
+
+		for (int i = 0; i < node.getChildNodes().getLength(); ++i)
+		{
+			final Node childNode = node.getChildNodes().item(i);
+
+			for (final String ignoreElement : ignoreElements)
+			{
+				if (childNode.getNodeName().toLowerCase().equals(ignoreElement.toLowerCase()))
+				{
+					removeNodes.add(childNode);
+				}
+			}
+		}
+
+		/* 
+		 * Loop through the nodes we found for removal, and insert an "innocuous" punctuation mark
+		 * that is used to prevent unintended run-ons when the ignored node is removed.
+		 */
+		for (final Node removeNode : removeNodes)
+		{
+			final Text textnode = node.getOwnerDocument().createTextNode(" " + ELEMENT_PUNCTUATION_MARKER + " ");
+			node.insertBefore(textnode, removeNode);
+			node.removeChild(removeNode);
+		}
+
+		for (int i = 0; i < node.getChildNodes().getLength(); ++i)
+		{
+			final Node childNode = node.getChildNodes().item(i);
+			replaceIgnoredElements(childNode, ignoreElements);
 		}
 	}
 }
