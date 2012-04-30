@@ -1,4 +1,4 @@
-369
+371
 ACPI
 AES
 AJP
@@ -64,6 +64,7 @@ Envers
 Errai
 ESB
 ESX
+ETag
 Ethernet
 Exif
 Facelet/S
@@ -202,6 +203,7 @@ LSB
 LUN
 LVM
 marshalled
+marshalling
 MB
 MBean/S
 MBps
