@@ -78,9 +78,10 @@ public class Main
 
 			final ExpandDataTrunk topicsExpand = new ExpandDataTrunk(new ExpandDataDetails("topics"));
 			expand.setBranches(CollectionUtilities.toArrayList(topicsExpand));
-			
+
 			final ExpandDataTrunk tagsExpand = new ExpandDataTrunk(new ExpandDataDetails("tags"));
-			topicsExpand.setBranches(CollectionUtilities.toArrayList(tagsExpand));
+			final ExpandDataTrunk propertiesExpand = new ExpandDataTrunk(new ExpandDataDetails("properties"));
+			topicsExpand.setBranches(CollectionUtilities.toArrayList(tagsExpand, propertiesExpand));
 
 			final String expandString = mapper.writeValueAsString(expand);
 			final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
@@ -126,20 +127,40 @@ public class Main
 		 * regardless of the results of the content checks. If errors are found,
 		 * the property tags will be added back with the new details.
 		 */
+		boolean topicIsUpdated = false;
+
 		final TopicV1 updateTopic = new TopicV1();
 		updateTopic.setId(topic.getId());
 		updateTopic.setPropertiesExplicit(new BaseRestCollectionV1<PropertyTagV1>());
 		updateTopic.setTagsExplicit(new BaseRestCollectionV1<TagV1>());
 
-		final PropertyTagV1 removeGrammarErrorPropertyTag = new PropertyTagV1();
-		removeGrammarErrorPropertyTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
-		removeGrammarErrorPropertyTag.setRemoveItem(true);
-		updateTopic.getProperties().addItem(removeGrammarErrorPropertyTag);
-
-		final PropertyTagV1 removeSpellingErrorPropertyTag = new PropertyTagV1();
-		removeSpellingErrorPropertyTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
-		removeSpellingErrorPropertyTag.setRemoveItem(true);
-		updateTopic.getProperties().addItem(removeSpellingErrorPropertyTag);
+		/* remove any old spelling error details */
+		for (final PropertyTagV1 tag : topic.getProperties().getItems())
+		{
+			if (tag.getId().equals(GRAMMAR_ERRORS_PROPERTY_TAG_ID))
+			{
+				final PropertyTagV1 removeGrammarErrorPropertyTag = new PropertyTagV1();
+				removeGrammarErrorPropertyTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
+				removeGrammarErrorPropertyTag.setValue(tag.getValue());
+				removeGrammarErrorPropertyTag.setRemoveItem(true);
+				updateTopic.getProperties().addItem(removeGrammarErrorPropertyTag);
+				topicIsUpdated = true;
+			}
+		}
+		
+		/* remove any old grammar error details */
+		for (final PropertyTagV1 tag : topic.getProperties().getItems())
+		{
+			if (tag.getId().equals(SPELLING_ERRORS_PROPERTY_TAG_ID))
+			{
+				final PropertyTagV1 removeSpellingErrorPropertyTag = new PropertyTagV1();
+				removeSpellingErrorPropertyTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
+				removeSpellingErrorPropertyTag.setValue(tag.getValue());
+				removeSpellingErrorPropertyTag.setRemoveItem(true);
+				updateTopic.getProperties().addItem(removeSpellingErrorPropertyTag);
+				topicIsUpdated = true;
+			}
+		}
 
 		/* Add or remove the spelling tags as needed */
 		boolean foundSpellingTag = false;
@@ -151,13 +172,14 @@ public class Main
 				break;
 			}
 		}
-		
+
 		if (spellingErrors.size() == 0 && foundSpellingTag)
 		{
 			final TagV1 removeSpellingErrorTag = new TagV1();
 			removeSpellingErrorTag.setRemoveItem(true);
 			removeSpellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(removeSpellingErrorTag);
+			topicIsUpdated = true;
 		}
 		else if (spellingErrors.size() != 0 && !foundSpellingTag)
 		{
@@ -165,8 +187,9 @@ public class Main
 			removeSpellingErrorTag.setAddItem(true);
 			removeSpellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(removeSpellingErrorTag);
+			topicIsUpdated = true;
 		}
-		
+
 		/* Add or remove the grammar tags as needed */
 		boolean foundGrammarTag = false;
 		for (final TagV1 tag : topic.getTags().getItems())
@@ -177,13 +200,14 @@ public class Main
 				break;
 			}
 		}
-		
+
 		if (doubleWords.size() == 0 && foundGrammarTag)
 		{
 			final TagV1 removeGrammarErrorTag = new TagV1();
 			removeGrammarErrorTag.setRemoveItem(true);
 			removeGrammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(removeGrammarErrorTag);
+			topicIsUpdated = true;
 		}
 		else if (doubleWords.size() != 0 && !foundGrammarTag)
 		{
@@ -191,11 +215,14 @@ public class Main
 			grammarErrorTag.setAddItem(true);
 			grammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(grammarErrorTag);
+			topicIsUpdated = true;
 		}
 
 		/* build up the property tags */
 		if (spellingErrors.size() != 0 || doubleWords.size() != 0)
 		{
+			topicIsUpdated = true;
+
 			System.out.println("Topic ID: " + topic.getId());
 			System.out.println("Topic Title: " + topic.getTitle());
 
@@ -261,35 +288,39 @@ public class Main
 				System.out.println();
 			}
 		}
-		
-		try
-		{
-			/*
-			 * final ExpandDataTrunk expand = new ExpandDataTrunk();
-			 * 
-			 * final ExpandDataTrunk tagsExpand = new ExpandDataTrunk(new
-			 * ExpandDataDetails("tags")); final ExpandDataTrunk
-			 * propertyTagsExpand = new ExpandDataTrunk(new
-			 * ExpandDataDetails("properties"));
-			 * 
-			 * expand.setBranches(CollectionUtilities.toArrayList(tagsExpand,
-			 * propertyTagsExpand));
-			 * 
-			 * final String expandString =
-			 * mapper.writeValueAsString(expand); final String
-			 * expandEncodedStrnig = URLEncoder.encode(expandString,
-			 * "UTF-8");
-			 * 
-			 * final TopicV1 updatedTopic =
-			 * restClient.updateJSONTopic(expandEncodedStrnig, updateTopic);
-			 * System.out.println(updatedTopic.getId());
-			 */
 
-			restClient.updateJSONTopic("", updateTopic);
-		}
-		catch (final Exception ex)
+		/* Update the topic in the database if there are changes that need to be persisted */
+		if (topicIsUpdated)
 		{
-			ExceptionUtilities.handleException(ex);
+			try
+			{
+				/*
+				 * final ExpandDataTrunk expand = new ExpandDataTrunk();
+				 * 
+				 * final ExpandDataTrunk tagsExpand = new ExpandDataTrunk(new
+				 * ExpandDataDetails("tags")); final ExpandDataTrunk
+				 * propertyTagsExpand = new ExpandDataTrunk(new
+				 * ExpandDataDetails("properties"));
+				 * 
+				 * expand.setBranches(CollectionUtilities.toArrayList(tagsExpand,
+				 * propertyTagsExpand));
+				 * 
+				 * final String expandString =
+				 * mapper.writeValueAsString(expand); final String
+				 * expandEncodedStrnig = URLEncoder.encode(expandString,
+				 * "UTF-8");
+				 * 
+				 * final TopicV1 updatedTopic =
+				 * restClient.updateJSONTopic(expandEncodedStrnig, updateTopic);
+				 * System.out.println(updatedTopic.getId());
+				 */
+
+				restClient.updateJSONTopic("", updateTopic);
+			}
+			catch (final Exception ex)
+			{
+				ExceptionUtilities.handleException(ex);
+			}
 		}
 	}
 
