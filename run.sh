@@ -10,7 +10,7 @@ USER=guest
 PASS=guest
 QUEUE=jms.queue.SkynetDocbookBuildQueue
 MAINCLASS=com.redhat.topicindex.syntaxchecker.Main
-NUMBER_OF_THREADS=1
+QUERY=query;
 
 java \
 -DtopicIndex.stompMessageServer=${STOMP_SERVER} \
@@ -19,4 +19,6 @@ java \
 -DtopicIndex.stompMessageServerPass=${PASS} \
 -DtopicIndex.stompMessageServerQueue=${QUEUE} \
 -DtopicIndex.skynetServer=${REST_SERVER} \
--cp bin:lib/* ${MAINCLASS}
+-DtopicIndex.spellCheckQuery=${QUERY} \
+-cp target/classes:lib/* ${MAINCLASS} 
+

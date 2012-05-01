@@ -21,6 +21,7 @@ CDI
 chkconfig
 CIFS
 ciphertext
+classload/GZR
 CLI
 CloudForms
 CMAN
@@ -347,7 +348,6 @@ virsh
 virt
 virtio
 virtualization
-Virtualization
 virtualized
 VLAN
 VM
