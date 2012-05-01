@@ -78,6 +78,9 @@ public class Main
 
 			final ExpandDataTrunk topicsExpand = new ExpandDataTrunk(new ExpandDataDetails("topics"));
 			expand.setBranches(CollectionUtilities.toArrayList(topicsExpand));
+			
+			final ExpandDataTrunk tagsExpand = new ExpandDataTrunk(new ExpandDataDetails("tags"));
+			topicsExpand.setBranches(CollectionUtilities.toArrayList(tagsExpand));
 
 			final String expandString = mapper.writeValueAsString(expand);
 			final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
@@ -103,53 +106,115 @@ public class Main
 
 	/**
 	 * Process the topic for spelling and grammar issues
-	 * @param topic The topic to process
-	 * @param ignoreElements The XML elements to ignore
-	 * @param standardDict The standard dictionary
-	 * @param customDict The custom dictionary
+	 * 
+	 * @param topic
+	 *            The topic to process
+	 * @param ignoreElements
+	 *            The XML elements to ignore
+	 * @param standardDict
+	 *            The standard dictionary
+	 * @param customDict
+	 *            The custom dictionary
 	 */
 	private void processDocument(final RESTInterfaceV1 restClient, final TopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
 	{
-		final List<SpellingErrorData> spellingErrors =  checkSpelling(topic, ignoreElements, standardDict, customDict);
+		final List<SpellingErrorData> spellingErrors = checkSpelling(topic, ignoreElements, standardDict, customDict);
 		final List<String> doubleWords = checkGrammar(topic, ignoreElements);
 
+		/*
+		 * The topic will be updated to remove the tags and property tags
+		 * regardless of the results of the content checks. If errors are found,
+		 * the property tags will be added back with the new details.
+		 */
+		final TopicV1 updateTopic = new TopicV1();
+		updateTopic.setId(topic.getId());
+		updateTopic.setPropertiesExplicit(new BaseRestCollectionV1<PropertyTagV1>());
+		updateTopic.setTagsExplicit(new BaseRestCollectionV1<TagV1>());
+
+		final PropertyTagV1 removeGrammarErrorPropertyTag = new PropertyTagV1();
+		removeGrammarErrorPropertyTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
+		removeGrammarErrorPropertyTag.setRemoveItem(true);
+		updateTopic.getProperties().addItem(removeGrammarErrorPropertyTag);
+
+		final PropertyTagV1 removeSpellingErrorPropertyTag = new PropertyTagV1();
+		removeSpellingErrorPropertyTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
+		removeSpellingErrorPropertyTag.setRemoveItem(true);
+		updateTopic.getProperties().addItem(removeSpellingErrorPropertyTag);
+
+		/* Add or remove the spelling tags as needed */
+		boolean foundSpellingTag = false;
+		for (final TagV1 tag : topic.getTags().getItems())
+		{
+			if (tag.getId().equals(SPELLING_ERRORS_TAG_ID))
+			{
+				foundSpellingTag = true;
+				break;
+			}
+		}
+		
+		if (spellingErrors.size() == 0 && foundSpellingTag)
+		{
+			final TagV1 removeSpellingErrorTag = new TagV1();
+			removeSpellingErrorTag.setRemoveItem(true);
+			removeSpellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
+			updateTopic.getTags().addItem(removeSpellingErrorTag);
+		}
+		else if (spellingErrors.size() != 0 && !foundSpellingTag)
+		{
+			final TagV1 removeSpellingErrorTag = new TagV1();
+			removeSpellingErrorTag.setAddItem(true);
+			removeSpellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
+			updateTopic.getTags().addItem(removeSpellingErrorTag);
+		}
+		
+		/* Add or remove the grammar tags as needed */
+		boolean foundGrammarTag = false;
+		for (final TagV1 tag : topic.getTags().getItems())
+		{
+			if (tag.getId().equals(GRAMMAR_ERRORS_TAG_ID))
+			{
+				foundGrammarTag = true;
+				break;
+			}
+		}
+		
+		if (doubleWords.size() == 0 && foundGrammarTag)
+		{
+			final TagV1 removeGrammarErrorTag = new TagV1();
+			removeGrammarErrorTag.setRemoveItem(true);
+			removeGrammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
+			updateTopic.getTags().addItem(removeGrammarErrorTag);
+		}
+		else if (doubleWords.size() != 0 && !foundGrammarTag)
+		{
+			final TagV1 grammarErrorTag = new TagV1();
+			grammarErrorTag.setAddItem(true);
+			grammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
+			updateTopic.getTags().addItem(grammarErrorTag);
+		}
+
+		/* build up the property tags */
 		if (spellingErrors.size() != 0 || doubleWords.size() != 0)
 		{
 			System.out.println("Topic ID: " + topic.getId());
 			System.out.println("Topic Title: " + topic.getTitle());
-			
-			final TopicV1 updateTopic = new TopicV1();
-			updateTopic.setId(topic.getId());
-			updateTopic.setPropertiesExplicit(new BaseRestCollectionV1<PropertyTagV1>());
-			updateTopic.setTagsExplicit(new BaseRestCollectionV1<TagV1>());
 
 			if (doubleWords.size() != 0)
 			{
 				final StringBuilder doubleWordErrors = new StringBuilder();
-				
+
 				if (doubleWords.size() != 0)
 				{
 					doubleWordErrors.append("Repeated Words: " + CollectionUtilities.toSeperatedString(doubleWords, ", "));
 					System.out.println(doubleWordErrors.toString());
 				}
-				
-				final PropertyTagV1 removeGrammarErrorTag = new PropertyTagV1();
-				removeGrammarErrorTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
-				removeGrammarErrorTag.setRemoveItem(true);
-				
+
 				final PropertyTagV1 addGrammarErrorTag = new PropertyTagV1();
 				addGrammarErrorTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
 				addGrammarErrorTag.setAddItem(true);
 				addGrammarErrorTag.setValueExplicit(doubleWordErrors.toString());
-				
-				updateTopic.getProperties().addItem(removeGrammarErrorTag);
+
 				updateTopic.getProperties().addItem(addGrammarErrorTag);
-				
-				final TagV1 grammarErrorTag = new TagV1();
-				grammarErrorTag.setAddItem(true);
-				grammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
-				
-				updateTopic.getTags().addItem(grammarErrorTag);
 			}
 
 			if (spellingErrors.size() != 0)
@@ -182,62 +247,65 @@ public class Main
 				}
 
 				System.out.println(spellingErrorsMessage.toString());
-				
+
 				/* Update the database */
-				final PropertyTagV1 removeSpellingErrorTag = new PropertyTagV1();
-				removeSpellingErrorTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
-				removeSpellingErrorTag.setRemoveItem(true);
-				
 				final PropertyTagV1 addSpellingErrorTag = new PropertyTagV1();
 				addSpellingErrorTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
 				addSpellingErrorTag.setAddItem(true);
 				addSpellingErrorTag.setValueExplicit(spellingErrorsMessage.toString());
-				
-				updateTopic.getProperties().addItem(removeSpellingErrorTag);
+
 				updateTopic.getProperties().addItem(addSpellingErrorTag);
-				
-				final TagV1 spellingErrorTag = new TagV1();
-				spellingErrorTag.setAddItem(true);
-				spellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
-				
-				updateTopic.getTags().addItem(spellingErrorTag);
 			}
 			else
 			{
 				System.out.println();
 			}
-			
-			try
-			{
-				/*final ExpandDataTrunk expand = new ExpandDataTrunk();
+		}
+		
+		try
+		{
+			/*
+			 * final ExpandDataTrunk expand = new ExpandDataTrunk();
+			 * 
+			 * final ExpandDataTrunk tagsExpand = new ExpandDataTrunk(new
+			 * ExpandDataDetails("tags")); final ExpandDataTrunk
+			 * propertyTagsExpand = new ExpandDataTrunk(new
+			 * ExpandDataDetails("properties"));
+			 * 
+			 * expand.setBranches(CollectionUtilities.toArrayList(tagsExpand,
+			 * propertyTagsExpand));
+			 * 
+			 * final String expandString =
+			 * mapper.writeValueAsString(expand); final String
+			 * expandEncodedStrnig = URLEncoder.encode(expandString,
+			 * "UTF-8");
+			 * 
+			 * final TopicV1 updatedTopic =
+			 * restClient.updateJSONTopic(expandEncodedStrnig, updateTopic);
+			 * System.out.println(updatedTopic.getId());
+			 */
 
-				final ExpandDataTrunk tagsExpand = new ExpandDataTrunk(new ExpandDataDetails("tags"));				
-				final ExpandDataTrunk propertyTagsExpand = new ExpandDataTrunk(new ExpandDataDetails("properties"));
-				
-				expand.setBranches(CollectionUtilities.toArrayList(tagsExpand, propertyTagsExpand));
-
-				final String expandString = mapper.writeValueAsString(expand);
-				final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
-				
-				final TopicV1 updatedTopic = restClient.updateJSONTopic(expandEncodedStrnig, updateTopic);
-				System.out.println(updatedTopic.getId());*/
-				
-				restClient.updateJSONTopic("", updateTopic);
-			}
-			catch(final Exception ex)
-			{
-				ExceptionUtilities.handleException(ex);
-			}
+			restClient.updateJSONTopic("", updateTopic);
+		}
+		catch (final Exception ex)
+		{
+			ExceptionUtilities.handleException(ex);
 		}
 	}
-	
+
 	/**
 	 * Checks the topic for spelling errors
-	 * @param topic The topic to process
-	 * @param ignoreElements The XML elements to ignore
-	 * @param standardDict The standard dictionary
-	 * @param customDict The custom dictionary
-	 * @return A collection of spelling errors, their frequency, and suggested replacements
+	 * 
+	 * @param topic
+	 *            The topic to process
+	 * @param ignoreElements
+	 *            The XML elements to ignore
+	 * @param standardDict
+	 *            The standard dictionary
+	 * @param customDict
+	 *            The custom dictionary
+	 * @return A collection of spelling errors, their frequency, and suggested
+	 *         replacements
 	 */
 	private List<SpellingErrorData> checkSpelling(final TopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
 	{
@@ -247,13 +315,13 @@ public class Main
 		final Document doc = XMLUtilities.convertStringToDocument(topic.getXml());
 		stripOutIgnoredElements(doc, ignoreElements);
 		final String cleanedXML = XMLUtilities.convertDocumentToString(doc, "UTF-8").replaceAll("\n", " ");
-		
+
 		final Source source = new Source(cleanedXML);
 		final String xmlText = source.getRenderer().toString();
 
 		/* Get the word list */
 		final List<String> xmlTextWords = CollectionUtilities.toArrayList(xmlText.split(PUNCTUATION_CHARACTERS_RE + "+"));
-		
+
 		/* Some collections to hold the spelling error details */
 		final Map<String, SpellingErrorData> misspelledWords = new HashMap<String, SpellingErrorData>();
 
@@ -285,14 +353,17 @@ public class Main
 				}
 			}
 		}
-		
+
 		return CollectionUtilities.toArrayList(misspelledWords.values());
 	}
-	
+
 	/**
 	 * Checks the Docbook XML for common grammar errors
-	 * @param topic The topic to process
-	 * @param ignoreElements The list of XML elements to ignore
+	 * 
+	 * @param topic
+	 *            The topic to process
+	 * @param ignoreElements
+	 *            The list of XML elements to ignore
 	 * @return A list of grammar errors that were found
 	 */
 	private List<String> checkGrammar(final TopicV1 topic, final List<String> ignoreElements)
@@ -303,7 +374,7 @@ public class Main
 		final Document grammarDoc = XMLUtilities.convertStringToDocument(topic.getXml());
 		replaceIgnoredElements(grammarDoc, ignoreElements);
 		final String grammarCleanedXML = XMLUtilities.convertDocumentToString(grammarDoc, "UTF-8").replaceAll("\n", " ");
-		
+
 		final Source grammarSource = new Source(replaceElementsWithMarkers(grammarCleanedXML));
 		final String grammarXmlText = grammarSource.getRenderer().toString();
 
@@ -345,7 +416,7 @@ public class Main
 				}
 			}
 		}
-		
+
 		return doubleWords;
 	}
 
@@ -355,25 +426,20 @@ public class Main
 	 * "Refer to <xref linkend="something"/> to find out more information" will
 	 * appear to have repeated the word "to" when the xref is removed.
 	 * 
-	 * This method will replace these elements with a punctuation marker, which 
+	 * This method will replace these elements with a punctuation marker, which
 	 * is then used to break up the sequence of words to prevent these false
 	 * positivies.
 	 * 
-	 * @param input The XML to be processed
+	 * @param input
+	 *            The XML to be processed
 	 * @return The XML with certain tags replaced with a punctuation marker
 	 */
 	private String replaceElementsWithMarkers(final String input)
 	{
-		return input.replaceAll(XREF_RE, ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll(ENTRY_RE, ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll(ENTRY_CLOSE_RE, ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_SEQUENCE_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_LIST_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_LISTITEMS_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_ALPHA_SORT_INJECTION_LIST_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_SINGLE_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll("<!--" + XMLPreProcessor.INJECT_CONTENT_FRAGMENT_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
-				.replaceAll("<!--" + XMLPreProcessor.INJECT_TITLE_FRAGMENT_RE + "-->", ELEMENT_PUNCTUATION_MARKER);				
+		return input.replaceAll(XREF_RE, ELEMENT_PUNCTUATION_MARKER).replaceAll(ENTRY_RE, ELEMENT_PUNCTUATION_MARKER).replaceAll(ENTRY_CLOSE_RE, ELEMENT_PUNCTUATION_MARKER).replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_SEQUENCE_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_LIST_RE + "-->", ELEMENT_PUNCTUATION_MARKER).replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_LISTITEMS_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.CUSTOM_ALPHA_SORT_INJECTION_LIST_RE + "-->", ELEMENT_PUNCTUATION_MARKER).replaceAll("<!--" + XMLPreProcessor.CUSTOM_INJECTION_SINGLE_RE + "-->", ELEMENT_PUNCTUATION_MARKER)
+				.replaceAll("<!--" + XMLPreProcessor.INJECT_CONTENT_FRAGMENT_RE + "-->", ELEMENT_PUNCTUATION_MARKER).replaceAll("<!--" + XMLPreProcessor.INJECT_TITLE_FRAGMENT_RE + "-->", ELEMENT_PUNCTUATION_MARKER);
 	}
 
 	/**
@@ -412,10 +478,10 @@ public class Main
 			stripOutIgnoredElements(childNode, ignoreElements);
 		}
 	}
-	
+
 	/**
-	 * Here we replace any nodes that we don't want to include in the grammar checks with
-	 * punctuation marks
+	 * Here we replace any nodes that we don't want to include in the grammar
+	 * checks with punctuation marks
 	 * 
 	 * @param node
 	 *            The node to process
@@ -439,9 +505,10 @@ public class Main
 			}
 		}
 
-		/* 
-		 * Loop through the nodes we found for removal, and insert an "innocuous" punctuation mark
-		 * that is used to prevent unintended run-ons when the ignored node is removed.
+		/*
+		 * Loop through the nodes we found for removal, and insert an
+		 * "innocuous" punctuation mark that is used to prevent unintended
+		 * run-ons when the ignored node is removed.
 		 */
 		for (final Node removeNode : removeNodes)
 		{
