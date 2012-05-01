@@ -1,11 +1,11 @@
+package com.redhat.topicindex.syntaxchecker;
+
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
-
 import javax.ws.rs.core.PathSegment;
 
 import net.htmlparser.jericho.Source;
@@ -39,21 +39,38 @@ import dk.dren.hunspell.Hunspell.Dictionary;
 
 public class Main
 {
+	/**
+	 * The system property that defines the query against which to run the
+	 * content checks
+	 */
 	private static final String SPELL_CHECK_QUERY_SYSTEM_PROPERTY = "topicIndex.spellCheckQuery";
+	/** The string constant that defines the Docbook elements to ignore */
 	private static final Integer DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID = 30;
+	/** The property tag that holds the gammar errors */
 	private static final Integer GRAMMAR_ERRORS_PROPERTY_TAG_ID = 27;
+	/** The property tag that holds the spelling errors */
 	private static final Integer SPELLING_ERRORS_PROPERTY_TAG_ID = 26;
+	/** The tag that indicates that a topic has a spelling error */
 	private static final Integer SPELLING_ERRORS_TAG_ID = 456;
+	/** The tag that indicates that a topic has a grammar error */
 	private static final Integer GRAMMAR_ERRORS_TAG_ID = 457;
 	/** http://en.wikipedia.org/wiki/Regular_expression#POSIX_character_classes **/
 	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^_`{|}~\\-\\s]";
+	/** A regex that matches an xref */
 	private static final String XREF_RE = "<xref*.?/\\s*>";
+	/** A regex that matches the opening tag of an entry */
 	private static final String ENTRY_RE = "<entry>";
+	/** A regext that matches a closing tag of an entry */
 	private static final String ENTRY_CLOSE_RE = "</entry>";
+	/**
+	 * A string that is used to replace ignored elements, to indicate that there
+	 * was a break between words before the element was removed
+	 */
 	private static final String ELEMENT_PUNCTUATION_MARKER = "#";
+	/** The Jackson mapper that converts POJOs to JSON */
 	private final ObjectMapper mapper = new ObjectMapper();
-	private final String query;
 
+	/** Entry point */
 	public static void main(final String[] args)
 	{
 		final ServiceStarter starter = new ServiceStarter();
@@ -66,10 +83,11 @@ public class Main
 
 	public Main(final ServiceStarter serviceStarter)
 	{
-		query = System.getProperty(SPELL_CHECK_QUERY_SYSTEM_PROPERTY);
+		final String query = System.getProperty(SPELL_CHECK_QUERY_SYSTEM_PROPERTY);
 
 		try
 		{
+			/* Get the topics */
 			final RESTInterfaceV1 restClient = ProxyFactory.create(RESTInterfaceV1.class, serviceStarter.getSkynetServer());
 
 			final PathSegment pathSegment = new PathSegmentImpl(query, false);
@@ -87,17 +105,20 @@ public class Main
 			final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
 
 			final BaseRestCollectionV1<TopicV1> topics = restClient.getJSONTopicsWithQuery(pathSegment, expandEncodedStrnig);
+			
+			/* Get the tags to ignore */
 			final StringConstantV1 ignoreTags = restClient.getJSONStringConstant(DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID, "");
 			final List<String> ignoreTagsList = CollectionUtilities.toArrayList(ignoreTags.getValue().split("\r\n"));
 
+			/* Create the dictionaries */
 			final Dictionary standardDict = Hunspell.getInstance().getDictionary("target/classes/dict/en_US/en_US");
 			final Dictionary customDict = Hunspell.getInstance().getDictionary("target/classes/customdict/en_US/en_US");
 
+			/* Process the topics */
 			for (final TopicV1 topic : topics.getItems())
 			{
 				processDocument(restClient, topic, ignoreTagsList, standardDict, customDict);
 			}
-
 		}
 		catch (final Exception ex)
 		{
@@ -119,6 +140,7 @@ public class Main
 	 */
 	private void processDocument(final RESTInterfaceV1 restClient, final TopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
 	{
+		/* Run the content checks */
 		final List<SpellingErrorData> spellingErrors = checkSpelling(topic, ignoreElements, standardDict, customDict);
 		final List<String> doubleWords = checkGrammar(topic, ignoreElements);
 
@@ -147,7 +169,7 @@ public class Main
 				topicIsUpdated = true;
 			}
 		}
-		
+
 		/* remove any old grammar error details */
 		for (final PropertyTagV1 tag : topic.getProperties().getItems())
 		{
@@ -289,7 +311,10 @@ public class Main
 			}
 		}
 
-		/* Update the topic in the database if there are changes that need to be persisted */
+		/*
+		 * Update the topic in the database if there are changes that need to be
+		 * persisted
+		 */
 		if (topicIsUpdated)
 		{
 			try
