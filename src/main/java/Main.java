@@ -25,7 +25,9 @@ import com.redhat.ecs.commonutils.XMLUtilities;
 import com.redhat.ecs.servicepojo.ServiceStarter;
 import com.redhat.ecs.services.docbookcompiling.xmlprocessing.XMLPreProcessor;
 import com.redhat.topicindex.rest.collections.BaseRestCollectionV1;
+import com.redhat.topicindex.rest.entities.PropertyTagV1;
 import com.redhat.topicindex.rest.entities.StringConstantV1;
+import com.redhat.topicindex.rest.entities.TagV1;
 import com.redhat.topicindex.rest.entities.TopicV1;
 import com.redhat.topicindex.rest.expand.ExpandDataDetails;
 import com.redhat.topicindex.rest.expand.ExpandDataTrunk;
@@ -39,6 +41,10 @@ public class Main
 {
 	private static final String SPELL_CHECK_QUERY_SYSTEM_PROPERTY = "topicIndex.spellCheckQuery";
 	private static final Integer DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID = 30;
+	private static final Integer GRAMMAR_ERRORS_PROPERTY_TAG_ID = 27;
+	private static final Integer SPELLING_ERRORS_PROPERTY_TAG_ID = 26;
+	private static final Integer SPELLING_ERRORS_TAG_ID = 456;
+	private static final Integer GRAMMAR_ERRORS_TAG_ID = 457;
 	/** http://en.wikipedia.org/wiki/Regular_expression#POSIX_character_classes **/
 	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^_`{|}~\\-\\s]";
 	private static final String XREF_RE = "<xref*.?/\\s*>";
@@ -85,7 +91,7 @@ public class Main
 
 			for (final TopicV1 topic : topics.getItems())
 			{
-				processDocument(topic, ignoreTagsList, standardDict, customDict);
+				processDocument(restClient, topic, ignoreTagsList, standardDict, customDict);
 			}
 
 		}
@@ -102,7 +108,7 @@ public class Main
 	 * @param standardDict The standard dictionary
 	 * @param customDict The custom dictionary
 	 */
-	private void processDocument(final TopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
+	private void processDocument(final RESTInterfaceV1 restClient, final TopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
 	{
 		final List<SpellingErrorData> spellingErrors =  checkSpelling(topic, ignoreElements, standardDict, customDict);
 		final List<String> doubleWords = checkGrammar(topic, ignoreElements);
@@ -111,16 +117,39 @@ public class Main
 		{
 			System.out.println("Topic ID: " + topic.getId());
 			System.out.println("Topic Title: " + topic.getTitle());
+			
+			final TopicV1 updateTopic = new TopicV1();
+			updateTopic.setId(topic.getId());
+			updateTopic.setPropertiesExplicit(new BaseRestCollectionV1<PropertyTagV1>());
+			updateTopic.setTagsExplicit(new BaseRestCollectionV1<TagV1>());
 
 			if (doubleWords.size() != 0)
 			{
 				final StringBuilder doubleWordErrors = new StringBuilder();
-
+				
 				if (doubleWords.size() != 0)
 				{
-					doubleWordErrors.append("Doubled Words: " + CollectionUtilities.toSeperatedString(doubleWords, ", "));
+					doubleWordErrors.append("Repeated Words: " + CollectionUtilities.toSeperatedString(doubleWords, ", "));
 					System.out.println(doubleWordErrors.toString());
 				}
+				
+				final PropertyTagV1 removeGrammarErrorTag = new PropertyTagV1();
+				removeGrammarErrorTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
+				removeGrammarErrorTag.setRemoveItem(true);
+				
+				final PropertyTagV1 addGrammarErrorTag = new PropertyTagV1();
+				addGrammarErrorTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
+				addGrammarErrorTag.setAddItem(true);
+				addGrammarErrorTag.setValueExplicit(doubleWordErrors.toString());
+				
+				updateTopic.getProperties().addItem(removeGrammarErrorTag);
+				updateTopic.getProperties().addItem(addGrammarErrorTag);
+				
+				final TagV1 grammarErrorTag = new TagV1();
+				grammarErrorTag.setAddItem(true);
+				grammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
+				
+				updateTopic.getTags().addItem(grammarErrorTag);
 			}
 
 			if (spellingErrors.size() != 0)
@@ -153,10 +182,51 @@ public class Main
 				}
 
 				System.out.println(spellingErrorsMessage.toString());
+				
+				/* Update the database */
+				final PropertyTagV1 removeSpellingErrorTag = new PropertyTagV1();
+				removeSpellingErrorTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
+				removeSpellingErrorTag.setRemoveItem(true);
+				
+				final PropertyTagV1 addSpellingErrorTag = new PropertyTagV1();
+				addSpellingErrorTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
+				addSpellingErrorTag.setAddItem(true);
+				addSpellingErrorTag.setValueExplicit(spellingErrorsMessage.toString());
+				
+				updateTopic.getProperties().addItem(removeSpellingErrorTag);
+				updateTopic.getProperties().addItem(addSpellingErrorTag);
+				
+				final TagV1 spellingErrorTag = new TagV1();
+				spellingErrorTag.setAddItem(true);
+				spellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
+				
+				updateTopic.getTags().addItem(spellingErrorTag);
 			}
 			else
 			{
 				System.out.println();
+			}
+			
+			try
+			{
+				/*final ExpandDataTrunk expand = new ExpandDataTrunk();
+
+				final ExpandDataTrunk tagsExpand = new ExpandDataTrunk(new ExpandDataDetails("tags"));				
+				final ExpandDataTrunk propertyTagsExpand = new ExpandDataTrunk(new ExpandDataDetails("properties"));
+				
+				expand.setBranches(CollectionUtilities.toArrayList(tagsExpand, propertyTagsExpand));
+
+				final String expandString = mapper.writeValueAsString(expand);
+				final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
+				
+				final TopicV1 updatedTopic = restClient.updateJSONTopic(expandEncodedStrnig, updateTopic);
+				System.out.println(updatedTopic.getId());*/
+				
+				restClient.updateJSONTopic("", updateTopic);
+			}
+			catch(final Exception ex)
+			{
+				ExceptionUtilities.handleException(ex);
 			}
 		}
 	}
