@@ -20,5 +20,5 @@ java \
 -DtopicIndex.stompMessageServerQueue=${QUEUE} \
 -DtopicIndex.skynetServer=${REST_SERVER} \
 -DtopicIndex.spellCheckQuery=${QUERY} \
--cp target/classes:lib/* ${MAINCLASS} 
+-jar spellchecker-service.jar
 
