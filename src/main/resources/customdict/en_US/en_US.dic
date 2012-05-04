@@ -1,4 +1,4 @@
-371
+375
 ACPI
 AES
 AJP
@@ -273,6 +273,7 @@ qdiskd
 QE
 QEMU
 RAM
+redeploy
 remoting
 RESTEasy
 Restful
@@ -332,8 +333,10 @@ truststores
 UDP
 UID
 UltraSPARC
+undeploy
 unicast
 Unicast
+uninstall
 UNIX
 UPS
 URI/S
@@ -356,6 +359,7 @@ VMware
 VNC
 VPN
 WCA
+wildcard
 Workflow
 writeback
 WS

@@ -73,21 +73,30 @@ public class Main
 	/** Entry point */
 	public static void main(final String[] args)
 	{
+		System.out.println("-> Main.main()");
+		
 		final ServiceStarter starter = new ServiceStarter();
 		if (starter.isValid())
 		{
 			RegisterBuiltin.register(ResteasyProviderFactory.getInstance());
 			new Main(starter);
 		}
+		
+		System.out.println("<- Main.main()");
 	}
 
 	public Main(final ServiceStarter serviceStarter)
 	{
+		System.out.println("-> Main.Main()");
+		
 		final String query = System.getProperty(SPELL_CHECK_QUERY_SYSTEM_PROPERTY);
 
 		try
 		{
 			/* Get the topics */
+			
+			System.out.println("Main.Main() - Getting topics from query " + query);
+			
 			final RESTInterfaceV1 restClient = ProxyFactory.create(RESTInterfaceV1.class, serviceStarter.getSkynetServer());
 
 			final PathSegment pathSegment = new PathSegmentImpl(query, false);
@@ -124,6 +133,8 @@ public class Main
 		{
 			ExceptionUtilities.handleException(ex);
 		}
+		
+		System.out.println("<- Main.Main()");
 	}
 
 	/**
