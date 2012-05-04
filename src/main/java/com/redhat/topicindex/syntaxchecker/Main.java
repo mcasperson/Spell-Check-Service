@@ -400,7 +400,7 @@ public class Main
 
 			/* make sure we are not looking at a blank string, or a combination of underscores and dashes */
 			if (!trimmedWord.isEmpty() &&
-				!trimmedWord.matches("[_\\-]+)"))
+				!trimmedWord.matches("[_\\-]+"))
 			{
 				/* Check spelling */
 				final boolean standardDictMispelled = standarddict.misspelled(word);
