@@ -1,6 +1,10 @@
-377
+385
+1PC
+2PC
 32-bit
+64-bit
 ACPI
+adaptor
 AES
 AJP
 AMD
@@ -105,6 +109,7 @@ Guestfish
 GWT
 Gzip
 H2
+HA-JNDI
 hivex
 homepage
 HornetQ
@@ -162,6 +167,7 @@ Javadoc/S
 JavaMail
 JavaScript
 JAX
+JAX-RS
 JAXB
 JAXP
 JAXWS
@@ -187,6 +193,7 @@ JSR
 JSSE
 JSTL
 JTA
+JTS
 JVM/S
 Kbps
 KDC
@@ -253,7 +260,7 @@ PicketBox
 PicketLink
 PKI
 plaintext
-plug-in
+plug-in/S
 PNG
 POH5
 POJO
@@ -274,6 +281,7 @@ qdiskd
 QE
 QEMU
 RAM
+RAR/S
 redeploy
 remoting
 RESTEasy
@@ -361,7 +369,7 @@ VMware
 VNC
 VPN
 WCA
-wildcard
+wildcard/S
 Workflow
 writeback
 WS

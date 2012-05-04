@@ -396,8 +396,11 @@ public class Main
 		for (int i = 0; i < xmlTextWords.size(); ++i)
 		{
 			final String word = xmlTextWords.get(i);
+			final String trimmedWord = word.trim();
 
-			if (!word.trim().isEmpty())
+			/* make sure we are not looking at a blank string, or a combination of underscores and dashes */
+			if (!trimmedWord.isEmpty() &&
+				!trimmedWord.matches("[_\\-]+)"))
 			{
 				/* Check spelling */
 				final boolean standardDictMispelled = standarddict.misspelled(word);
