@@ -70,33 +70,35 @@ public class Main
 	/** The Jackson mapper that converts POJOs to JSON */
 	private final ObjectMapper mapper = new ObjectMapper();
 
+	private final List<String> hypenatedWords = new ArrayList();
+
 	/** Entry point */
 	public static void main(final String[] args)
 	{
 		System.out.println("-> Main.main()");
-		
+
 		final ServiceStarter starter = new ServiceStarter();
 		if (starter.isValid())
 		{
 			RegisterBuiltin.register(ResteasyProviderFactory.getInstance());
 			new Main(starter);
 		}
-		
+
 		System.out.println("<- Main.main()");
 	}
 
 	public Main(final ServiceStarter serviceStarter)
 	{
 		System.out.println("-> Main.Main()");
-		
+
 		final String query = System.getProperty(SPELL_CHECK_QUERY_SYSTEM_PROPERTY);
 
 		try
 		{
 			/* Get the topics */
-			
+
 			System.out.println("Main.Main() - Getting topics from query " + query);
-			
+
 			final RESTInterfaceV1 restClient = ProxyFactory.create(RESTInterfaceV1.class, serviceStarter.getSkynetServer());
 
 			final PathSegment pathSegment = new PathSegmentImpl(query, false);
@@ -114,7 +116,7 @@ public class Main
 			final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
 
 			final BaseRestCollectionV1<TopicV1> topics = restClient.getJSONTopicsWithQuery(pathSegment, expandEncodedStrnig);
-			
+
 			/* Get the tags to ignore */
 			final StringConstantV1 ignoreTags = restClient.getJSONStringConstant(DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID, "");
 			final List<String> ignoreTagsList = CollectionUtilities.toArrayList(ignoreTags.getValue().split("\r\n"));
@@ -128,12 +130,15 @@ public class Main
 			{
 				processDocument(restClient, topic, ignoreTagsList, standardDict, customDict);
 			}
+
+			for (final String word : this.hypenatedWords)
+				System.out.println(word);
 		}
 		catch (final Exception ex)
 		{
 			ExceptionUtilities.handleException(ex);
 		}
-		
+
 		System.out.println("<- Main.Main()");
 	}
 
@@ -249,6 +254,16 @@ public class Main
 			grammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(grammarErrorTag);
 			topicIsUpdated = true;
+		}
+
+		for (final SpellingErrorData error : spellingErrors)
+		{
+			final String word = error.getMisspelledWord();
+			if (word.matches("[^-]+-[^-]+"))
+			{
+				if (!hypenatedWords.contains(word))
+					hypenatedWords.add(word);
+			}
 		}
 
 		/* build up the property tags */
@@ -398,9 +413,11 @@ public class Main
 			final String word = xmlTextWords.get(i);
 			final String trimmedWord = word.trim();
 
-			/* make sure we are not looking at a blank string, or a combination of underscores and dashes */
-			if (!trimmedWord.isEmpty() &&
-				!trimmedWord.matches("[_\\-]+"))
+			/*
+			 * make sure we are not looking at a blank string, or a combination
+			 * of underscores and dashes
+			 */
+			if (!trimmedWord.isEmpty() && !trimmedWord.matches("[_\\-]+"))
 			{
 				/* Check spelling */
 				final boolean standardDictMispelled = standarddict.misspelled(word);
@@ -438,50 +455,57 @@ public class Main
 	 */
 	private List<String> checkGrammar(final TopicV1 topic, final List<String> ignoreElements)
 	{
+		final List<String> doubleWords = new ArrayList<String>();
+
 		/*
 		 * prepare the topic xml for a grammar check
 		 */
 		final Document grammarDoc = XMLUtilities.convertStringToDocument(topic.getXml());
-		replaceIgnoredElements(grammarDoc, ignoreElements);
-		final String grammarCleanedXML = XMLUtilities.convertDocumentToString(grammarDoc, "UTF-8").replaceAll("\n", " ");
-
-		final Source grammarSource = new Source(replaceElementsWithMarkers(grammarCleanedXML));
-		final String grammarXmlText = grammarSource.getRenderer().toString();
-
-		/* Get the grammar word list */
-		final List<String> xmlTextWordsForDoubleChecking = CollectionUtilities.toArrayList(grammarXmlText.split("\\s+"));
-
-		final List<String> doubleWords = new ArrayList<String>();
-
-		/* Check for double words */
-		for (int i = 0; i < xmlTextWordsForDoubleChecking.size(); ++i)
+		
+		if (grammarDoc != null)
 		{
-			final String word = xmlTextWordsForDoubleChecking.get(i);
+			replaceIgnoredElements(grammarDoc, ignoreElements);
+			final String grammarCleanedXML = XMLUtilities.convertDocumentToString(grammarDoc, "UTF-8").replaceAll("\n", " ");
 
-			if (!word.trim().isEmpty())
+			if (grammarCleanedXML != null)
 			{
-				/* Check for doubled words */
-				if (i != 0)
+				final Source grammarSource = new Source(replaceElementsWithMarkers(grammarCleanedXML));
+				final String grammarXmlText = grammarSource.getRenderer().toString();
+
+				/* Get the grammar word list */
+				final List<String> xmlTextWordsForDoubleChecking = CollectionUtilities.toArrayList(grammarXmlText.split("\\s+"));
+
+				/* Check for double words */
+				for (int i = 0; i < xmlTextWordsForDoubleChecking.size(); ++i)
 				{
-					/* don't detected numbers */
-					try
-					{
-						Double.parseDouble(word);
-						continue;
-					}
-					catch (final Exception ex)
-					{
+					final String word = xmlTextWordsForDoubleChecking.get(i);
 
-					}
-
-					/* make sure the "word" is not just punctuation */
-					if (word.matches(PUNCTUATION_CHARACTERS_RE + "+"))
-						continue;
-
-					if (word.toLowerCase().equals(xmlTextWordsForDoubleChecking.get(i - 1)))
+					if (!word.trim().isEmpty())
 					{
-						if (!doubleWords.contains(word + " " + word))
-							doubleWords.add(word + " " + word);
+						/* Check for doubled words */
+						if (i != 0)
+						{
+							/* don't detected numbers */
+							try
+							{
+								Double.parseDouble(word);
+								continue;
+							}
+							catch (final Exception ex)
+							{
+
+							}
+
+							/* make sure the "word" is not just punctuation */
+							if (word.matches(PUNCTUATION_CHARACTERS_RE + "+"))
+								continue;
+
+							if (word.toLowerCase().equals(xmlTextWordsForDoubleChecking.get(i - 1)))
+							{
+								if (!doubleWords.contains(word + " " + word))
+									doubleWords.add(word + " " + word);
+							}
+						}
 					}
 				}
 			}
