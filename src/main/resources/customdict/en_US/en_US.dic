@@ -1,4 +1,4 @@
-375
+376
 ACPI
 AES
 AJP
@@ -277,6 +277,7 @@ redeploy
 remoting
 RESTEasy
 Restful
+RESTful
 RHCE
 RHN
 RHUA

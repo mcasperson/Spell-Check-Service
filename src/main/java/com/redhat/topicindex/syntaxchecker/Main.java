@@ -55,7 +55,7 @@ public class Main
 	/** The tag that indicates that a topic has a grammar error */
 	private static final Integer GRAMMAR_ERRORS_TAG_ID = 457;
 	/** http://en.wikipedia.org/wiki/Regular_expression#POSIX_character_classes **/
-	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^_`{|}~\\-\\s]";
+	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^`{|}~\\s]";
 	/** A regex that matches an xref */
 	private static final String XREF_RE = "<xref*.?/\\s*>";
 	/** A regex that matches the opening tag of an entry */
