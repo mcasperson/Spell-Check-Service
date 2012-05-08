@@ -10,6 +10,17 @@
 # copy the target/classes and target/lib files to the destination directory, 
 # and run this script file. 
 
+#The directory structure should look like:
+#\
+#  run.sh
+#  target
+#    lib
+#      JAR files copied by the mvn package command
+#    classes
+#      The various CLASS files created by mvn
+#      customdict
+#        The custom dictionary files
+
 #STOMP_SERVER=localhost
 #REST_SERVER=http://localhost:8080/TopicIndex/seam/resource/rest
 
