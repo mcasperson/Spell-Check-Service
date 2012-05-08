@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # For some reason using the Maven shade or assembly plug-ins results in 
-# an infinite loop, and a stack overflow error. The maven-dependency-plugin
+# an infinite loop, and a stack overflow error. So the maven-dependency-plugin
 # is used to collate the JAR files required for this application to run.
 # In addition, the Hunspell library requires access to the dictionaries as 
 # files, which means we can't have a self contained JAR file anyway.
