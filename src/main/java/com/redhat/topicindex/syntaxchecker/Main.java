@@ -425,6 +425,13 @@ public class Main
 
 				if (standardDictMispelled && customDictMispelled)
 				{
+					/*
+					 * This may have been a hyphenated word, which is more a
+					 * question of grammar than spelling. Check to see if it is
+					 * hyphenated, and if so split it up and see if each side was
+					 * a valid word.
+					 */
+
 					if (misspelledWords.containsKey(word))
 					{
 						misspelledWords.get(word).incMispellCount();
@@ -461,7 +468,7 @@ public class Main
 		 * prepare the topic xml for a grammar check
 		 */
 		final Document grammarDoc = XMLUtilities.convertStringToDocument(topic.getXml());
-		
+
 		if (grammarDoc != null)
 		{
 			replaceIgnoredElements(grammarDoc, ignoreElements);

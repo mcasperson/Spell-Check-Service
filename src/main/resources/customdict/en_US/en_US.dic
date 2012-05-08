@@ -1,10 +1,11 @@
-385
+404
 1PC
 2PC
 32-bit
 64-bit
 ACPI
 adaptor
+aero
 AES
 AJP
 AMD
@@ -13,16 +14,19 @@ APC
 API/S
 Applixware
 Arquillian
+astro
 ATM
 AUD
 auto-detect
 autofs
 BIND
+bio
 blktrace
 BMP
 bpp
 built-in
 CDI
+chemo
 chkconfig
 CIFS
 ciphertext
@@ -39,12 +43,14 @@ command-driven
 CORBA
 cross-site
 CSS
+cyber
 Cygmon
 datacenter
 datasource
 datasources
 Datasources
 DDL
+de
 deliverables
 DES
 DHCP
@@ -73,6 +79,7 @@ ESX
 ETag
 Ethernet
 Exif
+exo
 Facelet/S
 failover
 Failover
@@ -91,6 +98,7 @@ GAS
 GCC
 GCJ
 GDB
+geo
 GFS
 GID
 GIF
@@ -110,6 +118,7 @@ GWT
 Gzip
 H2
 HA-JNDI
+hemo
 hivex
 homepage
 HornetQ
@@ -121,6 +130,7 @@ HTML5
 http
 httpd
 HTTPS
+hyper
 Hyper-Threading
 hypervisor
 Hypervisor
@@ -133,6 +143,8 @@ IDE
 IDP
 iface
 IIS
+il
+im
 InfiniBand
 Infinispan
 initrd
@@ -150,6 +162,7 @@ ISAPI
 iSCSI
 iscsiadm
 iSeries
+iso
 Itanium
 J2EE
 J2ME
@@ -234,6 +247,7 @@ nameserver
 namespace
 namespace/S
 NAS
+neo
 NetworkManager
 NFS
 NIC
@@ -265,6 +279,7 @@ PNG
 POH5
 POJO
 POJO/S
+poly
 POM/S
 portlet
 portmap
@@ -273,9 +288,11 @@ PostgreSQL
 PostScript
 PowerPC
 PPP
+pre
 Preallocated
 prepend
 programmatically
+proto
 PXE
 qdiskd
 QE
@@ -339,10 +356,12 @@ Tivoli
 TODO
 tracepoint
 tracepoints
+tri
 truststores
 UDP
 UID
 UltraSPARC
+un
 undeploy
 unicast
 Unicast
