@@ -58,7 +58,7 @@ public class Main
 	/** The tag that indicates that a topic has a grammar error */
 	private static final Integer GRAMMAR_ERRORS_TAG_ID = 457;
 	/** http://en.wikipedia.org/wiki/Regular_expression#POSIX_character_classes **/
-	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^`{|}~\\s]";
+	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&()*+,./:;<=>?@\\^`{|}~\\s]";
 	/** A Regular expression to identify hyphenated words **/
 	private static final Pattern HYPHENATED_WORD_RE = Pattern.compile("(?<First>[^-]+)-(?<Second>[^-]+)");
 	/** A regex that matches an xref */
