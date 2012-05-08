@@ -1,4 +1,4 @@
-404
+413
 1PC
 2PC
 32-bit
@@ -26,11 +26,14 @@ BMP
 bpp
 built-in
 CDI
+CGI
 chemo
 chkconfig
 CIFS
 ciphertext
 classload/GZR
+classname
+classpath
 CLI
 CloudForms
 CMAN
@@ -290,6 +293,7 @@ PowerPC
 PPP
 pre
 Preallocated
+precompiled
 prepend
 programmatically
 proto
@@ -310,10 +314,12 @@ RHUA
 ricci
 RichFaces
 RMI
+RMI-IIOP
 ROM
 RPC
 RPM/S
 RSA
+runtime/S
 S-record
 S/390
 S/390x
@@ -321,6 +327,7 @@ Samba
 SAML
 SAR
 SASL
+schemas
 SELinux
 seqhilo
 serializable
@@ -366,6 +373,8 @@ undeploy
 unicast
 Unicast
 uninstall
+uninstalled
+uninstalling
 UNIX
 UPS
 URI/S

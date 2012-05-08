@@ -6,6 +6,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import javax.ws.rs.core.PathSegment;
 
 import net.htmlparser.jericho.Source;
@@ -56,6 +59,8 @@ public class Main
 	private static final Integer GRAMMAR_ERRORS_TAG_ID = 457;
 	/** http://en.wikipedia.org/wiki/Regular_expression#POSIX_character_classes **/
 	private static final String PUNCTUATION_CHARACTERS_RE = "[\\]\\[!\"#$%&'()*+,./:;<=>?@\\^`{|}~\\s]";
+	/** A Regular expression to identify hyphenated words **/
+	private static final Pattern HYPHENATED_WORD_RE = Pattern.compile("(?<First>[^-]+)-(?<Second>[^-]+)");
 	/** A regex that matches an xref */
 	private static final String XREF_RE = "<xref*.?/\\s*>";
 	/** A regex that matches the opening tag of an entry */
@@ -69,8 +74,6 @@ public class Main
 	private static final String ELEMENT_PUNCTUATION_MARKER = "#";
 	/** The Jackson mapper that converts POJOs to JSON */
 	private final ObjectMapper mapper = new ObjectMapper();
-
-	private final List<String> hypenatedWords = new ArrayList();
 
 	/** Entry point */
 	public static void main(final String[] args)
@@ -130,9 +133,6 @@ public class Main
 			{
 				processDocument(restClient, topic, ignoreTagsList, standardDict, customDict);
 			}
-
-			for (final String word : this.hypenatedWords)
-				System.out.println(word);
 		}
 		catch (final Exception ex)
 		{
@@ -254,16 +254,6 @@ public class Main
 			grammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(grammarErrorTag);
 			topicIsUpdated = true;
-		}
-
-		for (final SpellingErrorData error : spellingErrors)
-		{
-			final String word = error.getMisspelledWord();
-			if (word.matches("[^-]+-[^-]+"))
-			{
-				if (!hypenatedWords.contains(word))
-					hypenatedWords.add(word);
-			}
 		}
 
 		/* build up the property tags */
@@ -431,6 +421,27 @@ public class Main
 					 * hyphenated, and if so split it up and see if each side was
 					 * a valid word.
 					 */
+					
+					final Matcher matcher = HYPHENATED_WORD_RE.matcher(word);
+					if (matcher.matches())
+					{
+						final String firstWord = matcher.group("First");
+						final String secondWord = matcher.group("Second");
+						
+						final boolean standardDictMispelledFirst = standarddict.misspelled(firstWord);
+						final boolean customDictMispelledFirst = customDict.misspelled(firstWord);
+						
+						final boolean standardDictMispelledSecond = standarddict.misspelled(secondWord);
+						final boolean customDictMispelledSecond = customDict.misspelled(secondWord);
+						
+						/* check to see if either component of the hyphenated word is misspelled on its own */
+						if (!(standardDictMispelledFirst && customDictMispelledFirst) &&
+							!(standardDictMispelledSecond && customDictMispelledSecond))
+						{
+							/* both words are valid on their own, so ignore this word */
+							continue;
+						}
+					}
 
 					if (misspelledWords.containsKey(word))
 					{
