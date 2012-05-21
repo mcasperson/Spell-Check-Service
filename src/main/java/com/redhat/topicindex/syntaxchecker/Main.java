@@ -381,79 +381,87 @@ public class Main
 	 */
 	private List<SpellingErrorData> checkSpelling(final TopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
 	{
+		/* Some collections to hold the spelling error details */
+		final Map<String, SpellingErrorData> misspelledWords = new HashMap<String, SpellingErrorData>();
+		
 		/*
 		 * prepare the topic xml for a spell check
 		 */
 		final Document doc = XMLUtilities.convertStringToDocument(topic.getXml());
-		stripOutIgnoredElements(doc, ignoreElements);
-		final String cleanedXML = XMLUtilities.convertDocumentToString(doc, "UTF-8").replaceAll("\n", " ");
-
-		final Source source = new Source(cleanedXML);
-		final String xmlText = source.getRenderer().toString();
-
-		/* Get the word list */
-		final List<String> xmlTextWords = CollectionUtilities.toArrayList(xmlText.split(PUNCTUATION_CHARACTERS_RE + "+"));
-
-		/* Some collections to hold the spelling error details */
-		final Map<String, SpellingErrorData> misspelledWords = new HashMap<String, SpellingErrorData>();
-
-		/* Check for spelling */
-		for (int i = 0; i < xmlTextWords.size(); ++i)
+		if (doc != null)
 		{
-			final String word = xmlTextWords.get(i);
-			final String trimmedWord = word.trim();
+			stripOutIgnoredElements(doc, ignoreElements);
+			final String cleanedXML = XMLUtilities.convertDocumentToString(doc, "UTF-8").replaceAll("\n", " ");
 
-			/*
-			 * make sure we are not looking at a blank string, or a combination
-			 * of underscores and dashes
-			 */
-			if (!trimmedWord.isEmpty() && !trimmedWord.matches("[_\\-]+"))
+			final Source source = new Source(cleanedXML);
+			final String xmlText = source.getRenderer().toString();
+
+			/* Get the word list */
+			final List<String> xmlTextWords = CollectionUtilities.toArrayList(xmlText.split(PUNCTUATION_CHARACTERS_RE + "+"));
+
+			/* Check for spelling */
+			for (int i = 0; i < xmlTextWords.size(); ++i)
 			{
-				/* Check spelling */
-				final boolean standardDictMispelled = standarddict.misspelled(word);
-				final boolean customDictMispelled = customDict.misspelled(word);
+				final String word = xmlTextWords.get(i);
+				final String trimmedWord = word.trim();
 
-				if (standardDictMispelled && customDictMispelled)
+				/*
+				 * make sure we are not looking at a blank string, or a
+				 * combination of underscores and dashes
+				 */
+				if (!trimmedWord.isEmpty() && !trimmedWord.matches("[_\\-]+"))
 				{
-					/*
-					 * This may have been a hyphenated word, which is more a
-					 * question of grammar than spelling. Check to see if it is
-					 * hyphenated, and if so split it up and see if each side was
-					 * a valid word.
-					 */
-					
-					final Matcher matcher = HYPHENATED_WORD_RE.matcher(word);
-					if (matcher.matches())
+					/* Check spelling */
+					final boolean standardDictMispelled = standarddict.misspelled(word);
+					final boolean customDictMispelled = customDict.misspelled(word);
+
+					if (standardDictMispelled && customDictMispelled)
 					{
-						final String firstWord = matcher.group("First");
-						final String secondWord = matcher.group("Second");
-						
-						final boolean standardDictMispelledFirst = standarddict.misspelled(firstWord);
-						final boolean customDictMispelledFirst = customDict.misspelled(firstWord);
-						
-						final boolean standardDictMispelledSecond = standarddict.misspelled(secondWord);
-						final boolean customDictMispelledSecond = customDict.misspelled(secondWord);
-						
-						/* check to see if either component of the hyphenated word is misspelled on its own */
-						if (!(standardDictMispelledFirst && customDictMispelledFirst) &&
-							!(standardDictMispelledSecond && customDictMispelledSecond))
+						/*
+						 * This may have been a hyphenated word, which is more a
+						 * question of grammar than spelling. Check to see if it
+						 * is hyphenated, and if so split it up and see if each
+						 * side was a valid word.
+						 */
+
+						final Matcher matcher = HYPHENATED_WORD_RE.matcher(word);
+						if (matcher.matches())
 						{
-							/* both words are valid on their own, so ignore this word */
-							continue;
+							final String firstWord = matcher.group("First");
+							final String secondWord = matcher.group("Second");
+
+							final boolean standardDictMispelledFirst = standarddict.misspelled(firstWord);
+							final boolean customDictMispelledFirst = customDict.misspelled(firstWord);
+
+							final boolean standardDictMispelledSecond = standarddict.misspelled(secondWord);
+							final boolean customDictMispelledSecond = customDict.misspelled(secondWord);
+
+							/*
+							 * check to see if either component of the
+							 * hyphenated word is misspelled on its own
+							 */
+							if (!(standardDictMispelledFirst && customDictMispelledFirst) && !(standardDictMispelledSecond && customDictMispelledSecond))
+							{
+								/*
+								 * both words are valid on their own, so ignore
+								 * this word
+								 */
+								continue;
+							}
 						}
-					}
 
-					if (misspelledWords.containsKey(word))
-					{
-						misspelledWords.get(word).incMispellCount();
-					}
-					else
-					{
-						final List<String> suggestions = standarddict.suggest(word);
-						CollectionUtilities.addAllThatDontExist(customDict.suggest(word), suggestions);
-						Collections.sort(suggestions);
+						if (misspelledWords.containsKey(word))
+						{
+							misspelledWords.get(word).incMispellCount();
+						}
+						else
+						{
+							final List<String> suggestions = standarddict.suggest(word);
+							CollectionUtilities.addAllThatDontExist(customDict.suggest(word), suggestions);
+							Collections.sort(suggestions);
 
-						misspelledWords.put(word, new SpellingErrorData(word, suggestions));
+							misspelledWords.put(word, new SpellingErrorData(word, suggestions));
+						}
 					}
 				}
 			}
