@@ -38,7 +38,7 @@ import com.redhat.topicindex.rest.entities.TopicV1;
 import com.redhat.topicindex.rest.entities.interfaces.IPropertyTagV1;
 import com.redhat.topicindex.rest.entities.interfaces.ITagV1;
 import com.redhat.topicindex.rest.entities.interfaces.ITopicV1;
-import com.redhat.topicindex.rest.entities.mixins.JacksonMixins;
+import com.redhat.topicindex.rest.entities.jacksonutils.JacksonContextResolver;
 import com.redhat.topicindex.rest.expand.ExpandDataDetails;
 import com.redhat.topicindex.rest.expand.ExpandDataTrunk;
 import com.redhat.topicindex.rest.sharedinterface.RESTInterfaceV1;
