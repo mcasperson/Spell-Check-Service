@@ -10,6 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.ws.rs.core.PathSegment;
+import javax.ws.rs.ext.RuntimeDelegate;
 
 import net.htmlparser.jericho.Source;
 
@@ -104,14 +105,14 @@ public class Main
 
 		try
 		{
-			/* Get the topics */
-
 			System.out.println("Main.Main() - Getting topics from query " + query);
-			
-			 ResteasyProviderFactory resteasyProviderFactory = ResteasyProviderFactory.getInstance(); 
-			 javax.ws.rs.ext.RuntimeDelegate.setInstance(resteasyProviderFactory); 
-			 resteasyProviderFactory.registerProvider(JacksonContextResolver.class); 
-			
+
+			/* Create a custom ObjectMapper to handle the mapping between the interfaces and the concrete classes */
+			final ResteasyProviderFactory resteasyProviderFactory = ResteasyProviderFactory.getInstance();
+			RuntimeDelegate.setInstance(resteasyProviderFactory);
+			resteasyProviderFactory.registerProvider(JacksonContextResolver.class);
+
+			/* Get the topics */
 			final RESTInterfaceV1 restClient = ProxyFactory.create(RESTInterfaceV1.class, serviceStarter.getSkynetServer());
 
 			final PathSegment pathSegment = new PathSegmentImpl(query, false);
@@ -388,13 +389,13 @@ public class Main
 	 *            The custom dictionary
 	 * @return A collection of spelling errors, their frequency, and suggested
 	 *         replacements
-	 * @throws SAXException 
+	 * @throws SAXException
 	 */
 	private List<SpellingErrorData> checkSpelling(final ITopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
 	{
 		/* Some collections to hold the spelling error details */
 		final Map<String, SpellingErrorData> misspelledWords = new HashMap<String, SpellingErrorData>();
-		
+
 		/*
 		 * prepare the topic xml for a spell check
 		 */
@@ -405,9 +406,9 @@ public class Main
 		}
 		catch (final Exception ex)
 		{
-			
+
 		}
-		
+
 		if (doc != null)
 		{
 			stripOutIgnoredElements(doc, ignoreElements);
@@ -511,9 +512,9 @@ public class Main
 		{
 			grammarDoc = XMLUtilities.convertStringToDocument(topic.getXml());
 		}
-		catch(final Exception ex)
+		catch (final Exception ex)
 		{
-			
+
 		}
 
 		if (grammarDoc != null)
