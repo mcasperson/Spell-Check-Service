@@ -16,11 +16,13 @@ import net.htmlparser.jericho.Source;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.jboss.resteasy.client.ProxyFactory;
 import org.jboss.resteasy.plugins.providers.RegisterBuiltin;
+import org.jboss.resteasy.plugins.providers.jackson.ResteasyJacksonProvider;
 import org.jboss.resteasy.specimpl.PathSegmentImpl;
 import org.jboss.resteasy.spi.ResteasyProviderFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.Text;
+import org.xml.sax.SAXException;
 
 import com.redhat.ecs.commonutils.CollectionUtilities;
 import com.redhat.ecs.commonutils.ExceptionUtilities;
@@ -32,6 +34,10 @@ import com.redhat.topicindex.rest.entities.PropertyTagV1;
 import com.redhat.topicindex.rest.entities.StringConstantV1;
 import com.redhat.topicindex.rest.entities.TagV1;
 import com.redhat.topicindex.rest.entities.TopicV1;
+import com.redhat.topicindex.rest.entities.interfaces.IPropertyTagV1;
+import com.redhat.topicindex.rest.entities.interfaces.ITagV1;
+import com.redhat.topicindex.rest.entities.interfaces.ITopicV1;
+import com.redhat.topicindex.rest.entities.mixins.JacksonMixins;
 import com.redhat.topicindex.rest.expand.ExpandDataDetails;
 import com.redhat.topicindex.rest.expand.ExpandDataTrunk;
 import com.redhat.topicindex.rest.sharedinterface.RESTInterfaceV1;
@@ -101,7 +107,11 @@ public class Main
 			/* Get the topics */
 
 			System.out.println("Main.Main() - Getting topics from query " + query);
-
+			
+			 ResteasyProviderFactory resteasyProviderFactory = ResteasyProviderFactory.getInstance(); 
+			 javax.ws.rs.ext.RuntimeDelegate.setInstance(resteasyProviderFactory); 
+			 resteasyProviderFactory.registerProvider(JacksonContextResolver.class); 
+			
 			final RESTInterfaceV1 restClient = ProxyFactory.create(RESTInterfaceV1.class, serviceStarter.getSkynetServer());
 
 			final PathSegment pathSegment = new PathSegmentImpl(query, false);
@@ -118,7 +128,7 @@ public class Main
 			final String expandString = mapper.writeValueAsString(expand);
 			final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
 
-			final BaseRestCollectionV1<TopicV1> topics = restClient.getJSONTopicsWithQuery(pathSegment, expandEncodedStrnig);
+			final BaseRestCollectionV1<ITopicV1> topics = restClient.getJSONTopicsWithQuery(pathSegment, expandEncodedStrnig);
 
 			/* Get the tags to ignore */
 			final StringConstantV1 ignoreTags = restClient.getJSONStringConstant(DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID, "");
@@ -129,7 +139,7 @@ public class Main
 			final Dictionary customDict = Hunspell.getInstance().getDictionary("target/classes/customdict/en_US/en_US");
 
 			/* Process the topics */
-			for (final TopicV1 topic : topics.getItems())
+			for (final ITopicV1 topic : topics.getItems())
 			{
 				processDocument(restClient, topic, ignoreTagsList, standardDict, customDict);
 			}
@@ -154,7 +164,7 @@ public class Main
 	 * @param customDict
 	 *            The custom dictionary
 	 */
-	private void processDocument(final RESTInterfaceV1 restClient, final TopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
+	private void processDocument(final RESTInterfaceV1 restClient, final ITopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
 	{
 		/* Run the content checks */
 		final List<SpellingErrorData> spellingErrors = checkSpelling(topic, ignoreElements, standardDict, customDict);
@@ -169,15 +179,15 @@ public class Main
 
 		final TopicV1 updateTopic = new TopicV1();
 		updateTopic.setId(topic.getId());
-		updateTopic.setPropertiesExplicit(new BaseRestCollectionV1<PropertyTagV1>());
-		updateTopic.setTagsExplicit(new BaseRestCollectionV1<TagV1>());
+		updateTopic.explicitSetProperties(new BaseRestCollectionV1<IPropertyTagV1>());
+		updateTopic.explicitSetTags(new BaseRestCollectionV1<ITagV1>());
 
 		/* remove any old spelling error details */
-		for (final PropertyTagV1 tag : topic.getProperties().getItems())
+		for (final IPropertyTagV1 tag : topic.getProperties().getItems())
 		{
 			if (tag.getId().equals(GRAMMAR_ERRORS_PROPERTY_TAG_ID))
 			{
-				final PropertyTagV1 removeGrammarErrorPropertyTag = new PropertyTagV1();
+				final IPropertyTagV1 removeGrammarErrorPropertyTag = new PropertyTagV1();
 				removeGrammarErrorPropertyTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
 				removeGrammarErrorPropertyTag.setValue(tag.getValue());
 				removeGrammarErrorPropertyTag.setRemoveItem(true);
@@ -187,11 +197,11 @@ public class Main
 		}
 
 		/* remove any old grammar error details */
-		for (final PropertyTagV1 tag : topic.getProperties().getItems())
+		for (final IPropertyTagV1 tag : topic.getProperties().getItems())
 		{
 			if (tag.getId().equals(SPELLING_ERRORS_PROPERTY_TAG_ID))
 			{
-				final PropertyTagV1 removeSpellingErrorPropertyTag = new PropertyTagV1();
+				final IPropertyTagV1 removeSpellingErrorPropertyTag = new PropertyTagV1();
 				removeSpellingErrorPropertyTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
 				removeSpellingErrorPropertyTag.setValue(tag.getValue());
 				removeSpellingErrorPropertyTag.setRemoveItem(true);
@@ -202,7 +212,7 @@ public class Main
 
 		/* Add or remove the spelling tags as needed */
 		boolean foundSpellingTag = false;
-		for (final TagV1 tag : topic.getTags().getItems())
+		for (final ITagV1 tag : topic.getTags().getItems())
 		{
 			if (tag.getId().equals(SPELLING_ERRORS_TAG_ID))
 			{
@@ -230,7 +240,7 @@ public class Main
 
 		/* Add or remove the grammar tags as needed */
 		boolean foundGrammarTag = false;
-		for (final TagV1 tag : topic.getTags().getItems())
+		for (final ITagV1 tag : topic.getTags().getItems())
 		{
 			if (tag.getId().equals(GRAMMAR_ERRORS_TAG_ID))
 			{
@@ -277,7 +287,7 @@ public class Main
 				final PropertyTagV1 addGrammarErrorTag = new PropertyTagV1();
 				addGrammarErrorTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
 				addGrammarErrorTag.setAddItem(true);
-				addGrammarErrorTag.setValueExplicit(doubleWordErrors.toString());
+				addGrammarErrorTag.explicitSetValue(doubleWordErrors.toString());
 
 				updateTopic.getProperties().addItem(addGrammarErrorTag);
 			}
@@ -317,7 +327,7 @@ public class Main
 				final PropertyTagV1 addSpellingErrorTag = new PropertyTagV1();
 				addSpellingErrorTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
 				addSpellingErrorTag.setAddItem(true);
-				addSpellingErrorTag.setValueExplicit(spellingErrorsMessage.toString());
+				addSpellingErrorTag.explicitSetValue(spellingErrorsMessage.toString());
 
 				updateTopic.getProperties().addItem(addSpellingErrorTag);
 			}
@@ -378,8 +388,9 @@ public class Main
 	 *            The custom dictionary
 	 * @return A collection of spelling errors, their frequency, and suggested
 	 *         replacements
+	 * @throws SAXException 
 	 */
-	private List<SpellingErrorData> checkSpelling(final TopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
+	private List<SpellingErrorData> checkSpelling(final ITopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
 	{
 		/* Some collections to hold the spelling error details */
 		final Map<String, SpellingErrorData> misspelledWords = new HashMap<String, SpellingErrorData>();
@@ -387,7 +398,16 @@ public class Main
 		/*
 		 * prepare the topic xml for a spell check
 		 */
-		final Document doc = XMLUtilities.convertStringToDocument(topic.getXml());
+		Document doc = null;
+		try
+		{
+			doc = XMLUtilities.convertStringToDocument(topic.getXml());
+		}
+		catch (final Exception ex)
+		{
+			
+		}
+		
 		if (doc != null)
 		{
 			stripOutIgnoredElements(doc, ignoreElements);
@@ -479,14 +499,22 @@ public class Main
 	 *            The list of XML elements to ignore
 	 * @return A list of grammar errors that were found
 	 */
-	private List<String> checkGrammar(final TopicV1 topic, final List<String> ignoreElements)
+	private List<String> checkGrammar(final ITopicV1 topic, final List<String> ignoreElements)
 	{
 		final List<String> doubleWords = new ArrayList<String>();
 
 		/*
 		 * prepare the topic xml for a grammar check
 		 */
-		final Document grammarDoc = XMLUtilities.convertStringToDocument(topic.getXml());
+		Document grammarDoc = null;
+		try
+		{
+			grammarDoc = XMLUtilities.convertStringToDocument(topic.getXml());
+		}
+		catch(final Exception ex)
+		{
+			
+		}
 
 		if (grammarDoc != null)
 		{
