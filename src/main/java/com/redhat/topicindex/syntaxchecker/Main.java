@@ -108,9 +108,7 @@ public class Main
 			System.out.println("Main.Main() - Getting topics from query " + query);
 
 			/* Create a custom ObjectMapper to handle the mapping between the interfaces and the concrete classes */
-			final ResteasyProviderFactory resteasyProviderFactory = ResteasyProviderFactory.getInstance();
-			RuntimeDelegate.setInstance(resteasyProviderFactory);
-			resteasyProviderFactory.registerProvider(JacksonContextResolver.class);
+			ResteasyProviderFactory.getInstance().registerProvider(JacksonContextResolver.class);
 
 			/* Get the topics */
 			final RESTInterfaceV1 restClient = ProxyFactory.create(RESTInterfaceV1.class, serviceStarter.getSkynetServer());
