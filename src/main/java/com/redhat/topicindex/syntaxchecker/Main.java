@@ -31,14 +31,10 @@ import com.redhat.ecs.commonutils.XMLUtilities;
 import com.redhat.ecs.servicepojo.ServiceStarter;
 import com.redhat.ecs.services.docbookcompiling.xmlprocessing.XMLPreProcessor;
 import com.redhat.topicindex.rest.collections.BaseRestCollectionV1;
-import com.redhat.topicindex.rest.entities.PropertyTagV1;
 import com.redhat.topicindex.rest.entities.StringConstantV1;
-import com.redhat.topicindex.rest.entities.TagV1;
-import com.redhat.topicindex.rest.entities.TopicV1;
-import com.redhat.topicindex.rest.entities.interfaces.IPropertyTagV1;
-import com.redhat.topicindex.rest.entities.interfaces.ITagV1;
-import com.redhat.topicindex.rest.entities.interfaces.ITopicV1;
-import com.redhat.topicindex.rest.entities.jacksonutils.JacksonContextResolver;
+import com.redhat.topicindex.rest.entities.interfaces.RESTPropertyTagV1;
+import com.redhat.topicindex.rest.entities.interfaces.RESTTagV1;
+import com.redhat.topicindex.rest.entities.interfaces.RESTTopicV1;
 import com.redhat.topicindex.rest.expand.ExpandDataDetails;
 import com.redhat.topicindex.rest.expand.ExpandDataTrunk;
 import com.redhat.topicindex.rest.sharedinterface.RESTInterfaceV1;
@@ -107,10 +103,8 @@ public class Main
 		{
 			System.out.println("Main.Main() - Getting topics from query " + query);
 
-			/* Create a custom ObjectMapper to handle the mapping between the interfaces and the concrete classes */
-			ResteasyProviderFactory.getInstance().registerProvider(JacksonContextResolver.class);
-
 			/* Get the topics */
+			RegisterBuiltin.register(ResteasyProviderFactory.getInstance());
 			final RESTInterfaceV1 restClient = ProxyFactory.create(RESTInterfaceV1.class, serviceStarter.getSkynetServer());
 
 			final PathSegment pathSegment = new PathSegmentImpl(query, false);
@@ -127,7 +121,7 @@ public class Main
 			final String expandString = mapper.writeValueAsString(expand);
 			final String expandEncodedStrnig = URLEncoder.encode(expandString, "UTF-8");
 
-			final BaseRestCollectionV1<ITopicV1> topics = restClient.getJSONTopicsWithQuery(pathSegment, expandEncodedStrnig);
+			final BaseRestCollectionV1<RESTTopicV1> topics = restClient.getJSONTopicsWithQuery(pathSegment, expandEncodedStrnig);
 
 			/* Get the tags to ignore */
 			final StringConstantV1 ignoreTags = restClient.getJSONStringConstant(DOCBOOK_IGNORE_ELEMENTS_STRING_CONSTANT_ID, "");
@@ -138,7 +132,7 @@ public class Main
 			final Dictionary customDict = Hunspell.getInstance().getDictionary("target/classes/customdict/en_US/en_US");
 
 			/* Process the topics */
-			for (final ITopicV1 topic : topics.getItems())
+			for (final RESTTopicV1 topic : topics.getItems())
 			{
 				processDocument(restClient, topic, ignoreTagsList, standardDict, customDict);
 			}
@@ -163,7 +157,7 @@ public class Main
 	 * @param customDict
 	 *            The custom dictionary
 	 */
-	private void processDocument(final RESTInterfaceV1 restClient, final ITopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
+	private void processDocument(final RESTInterfaceV1 restClient, final RESTTopicV1 topic, final List<String> ignoreElements, final Dictionary standardDict, final Dictionary customDict)
 	{
 		/* Run the content checks */
 		final List<SpellingErrorData> spellingErrors = checkSpelling(topic, ignoreElements, standardDict, customDict);
@@ -176,17 +170,17 @@ public class Main
 		 */
 		boolean topicIsUpdated = false;
 
-		final TopicV1 updateTopic = new TopicV1();
+		final RESTTopicV1 updateTopic = new RESTTopicV1();
 		updateTopic.setId(topic.getId());
-		updateTopic.explicitSetProperties(new BaseRestCollectionV1<IPropertyTagV1>());
-		updateTopic.explicitSetTags(new BaseRestCollectionV1<ITagV1>());
+		updateTopic.explicitSetProperties(new BaseRestCollectionV1<RESTPropertyTagV1>());
+		updateTopic.explicitSetTags(new BaseRestCollectionV1<RESTTagV1>());
 
 		/* remove any old spelling error details */
-		for (final IPropertyTagV1 tag : topic.getProperties().getItems())
+		for (final RESTPropertyTagV1 tag : topic.getProperties().getItems())
 		{
 			if (tag.getId().equals(GRAMMAR_ERRORS_PROPERTY_TAG_ID))
 			{
-				final IPropertyTagV1 removeGrammarErrorPropertyTag = new PropertyTagV1();
+				final RESTPropertyTagV1 removeGrammarErrorPropertyTag = new RESTPropertyTagV1();
 				removeGrammarErrorPropertyTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
 				removeGrammarErrorPropertyTag.setValue(tag.getValue());
 				removeGrammarErrorPropertyTag.setRemoveItem(true);
@@ -196,11 +190,11 @@ public class Main
 		}
 
 		/* remove any old grammar error details */
-		for (final IPropertyTagV1 tag : topic.getProperties().getItems())
+		for (final RESTPropertyTagV1 tag : topic.getProperties().getItems())
 		{
 			if (tag.getId().equals(SPELLING_ERRORS_PROPERTY_TAG_ID))
 			{
-				final IPropertyTagV1 removeSpellingErrorPropertyTag = new PropertyTagV1();
+				final RESTPropertyTagV1 removeSpellingErrorPropertyTag = new RESTPropertyTagV1();
 				removeSpellingErrorPropertyTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
 				removeSpellingErrorPropertyTag.setValue(tag.getValue());
 				removeSpellingErrorPropertyTag.setRemoveItem(true);
@@ -211,7 +205,7 @@ public class Main
 
 		/* Add or remove the spelling tags as needed */
 		boolean foundSpellingTag = false;
-		for (final ITagV1 tag : topic.getTags().getItems())
+		for (final RESTTagV1 tag : topic.getTags().getItems())
 		{
 			if (tag.getId().equals(SPELLING_ERRORS_TAG_ID))
 			{
@@ -222,7 +216,7 @@ public class Main
 
 		if (spellingErrors.size() == 0 && foundSpellingTag)
 		{
-			final TagV1 removeSpellingErrorTag = new TagV1();
+			final RESTTagV1 removeSpellingErrorTag = new RESTTagV1();
 			removeSpellingErrorTag.setRemoveItem(true);
 			removeSpellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(removeSpellingErrorTag);
@@ -230,7 +224,7 @@ public class Main
 		}
 		else if (spellingErrors.size() != 0 && !foundSpellingTag)
 		{
-			final TagV1 removeSpellingErrorTag = new TagV1();
+			final RESTTagV1 removeSpellingErrorTag = new RESTTagV1();
 			removeSpellingErrorTag.setAddItem(true);
 			removeSpellingErrorTag.setId(SPELLING_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(removeSpellingErrorTag);
@@ -239,7 +233,7 @@ public class Main
 
 		/* Add or remove the grammar tags as needed */
 		boolean foundGrammarTag = false;
-		for (final ITagV1 tag : topic.getTags().getItems())
+		for (final RESTTagV1 tag : topic.getTags().getItems())
 		{
 			if (tag.getId().equals(GRAMMAR_ERRORS_TAG_ID))
 			{
@@ -250,7 +244,7 @@ public class Main
 
 		if (doubleWords.size() == 0 && foundGrammarTag)
 		{
-			final TagV1 removeGrammarErrorTag = new TagV1();
+			final RESTTagV1 removeGrammarErrorTag = new RESTTagV1();
 			removeGrammarErrorTag.setRemoveItem(true);
 			removeGrammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(removeGrammarErrorTag);
@@ -258,7 +252,7 @@ public class Main
 		}
 		else if (doubleWords.size() != 0 && !foundGrammarTag)
 		{
-			final TagV1 grammarErrorTag = new TagV1();
+			final RESTTagV1 grammarErrorTag = new RESTTagV1();
 			grammarErrorTag.setAddItem(true);
 			grammarErrorTag.setId(GRAMMAR_ERRORS_TAG_ID);
 			updateTopic.getTags().addItem(grammarErrorTag);
@@ -283,7 +277,7 @@ public class Main
 					System.out.println(doubleWordErrors.toString());
 				}
 
-				final PropertyTagV1 addGrammarErrorTag = new PropertyTagV1();
+				final RESTPropertyTagV1 addGrammarErrorTag = new RESTPropertyTagV1();
 				addGrammarErrorTag.setId(GRAMMAR_ERRORS_PROPERTY_TAG_ID);
 				addGrammarErrorTag.setAddItem(true);
 				addGrammarErrorTag.explicitSetValue(doubleWordErrors.toString());
@@ -323,7 +317,7 @@ public class Main
 				System.out.println(spellingErrorsMessage.toString());
 
 				/* Update the database */
-				final PropertyTagV1 addSpellingErrorTag = new PropertyTagV1();
+				final RESTPropertyTagV1 addSpellingErrorTag = new RESTPropertyTagV1();
 				addSpellingErrorTag.setId(SPELLING_ERRORS_PROPERTY_TAG_ID);
 				addSpellingErrorTag.setAddItem(true);
 				addSpellingErrorTag.explicitSetValue(spellingErrorsMessage.toString());
@@ -360,7 +354,7 @@ public class Main
 				 * expandEncodedStrnig = URLEncoder.encode(expandString,
 				 * "UTF-8");
 				 * 
-				 * final TopicV1 updatedTopic =
+				 * final RESTTopicV1 updatedTopic =
 				 * restClient.updateJSONTopic(expandEncodedStrnig, updateTopic);
 				 * System.out.println(updatedTopic.getId());
 				 */
@@ -389,7 +383,7 @@ public class Main
 	 *         replacements
 	 * @throws SAXException
 	 */
-	private List<SpellingErrorData> checkSpelling(final ITopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
+	private List<SpellingErrorData> checkSpelling(final RESTTopicV1 topic, final List<String> ignoreElements, final Dictionary standarddict, final Dictionary customDict)
 	{
 		/* Some collections to hold the spelling error details */
 		final Map<String, SpellingErrorData> misspelledWords = new HashMap<String, SpellingErrorData>();
@@ -498,7 +492,7 @@ public class Main
 	 *            The list of XML elements to ignore
 	 * @return A list of grammar errors that were found
 	 */
-	private List<String> checkGrammar(final ITopicV1 topic, final List<String> ignoreElements)
+	private List<String> checkGrammar(final RESTTopicV1 topic, final List<String> ignoreElements)
 	{
 		final List<String> doubleWords = new ArrayList<String>();
 

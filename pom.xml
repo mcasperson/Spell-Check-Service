@@ -7,7 +7,7 @@
 	<repositories>
 		<repository>
 			<id>ECS</id>
-			<url>http://ecsmaven.usersys.redhat.com/nexus</url>
+			<url>http://ecsmaven.usersys.redhat.com/nexus/content/groups/public/</url>
 		</repository>
 		<repository>
 			<id>JBoss</id>
